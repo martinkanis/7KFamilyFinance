@@ -22,8 +22,9 @@ import {
   monthLabel,
   shortMonthLabel,
 } from "@/lib/format";
+import { DESKTOP_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
 
-const CHART_HEIGHT = 300;
+const CHART_HEIGHT = { desktop: 300, mobile: 220 };
 const THOUSANDS = new Intl.NumberFormat("cs-CZ", { notation: "compact" });
 
 const MONEY_COLUMNS: {
@@ -52,6 +53,7 @@ function sumOf(
 }
 
 function WealthChart({ months }: { months: OverviewMonth[] }) {
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const data = months.map((m) => ({
     label: shortMonthLabel(m.month),
     bilance: m.balance,
@@ -61,23 +63,28 @@ function WealthChart({ months }: { months: OverviewMonth[] }) {
   return (
     <Card className="p-4">
       <h2 className="mb-3 font-semibold">Bilance měsíce a vývoj majetku</h2>
-      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+      <ResponsiveContainer
+        width="100%"
+        height={isDesktop ? CHART_HEIGHT.desktop : CHART_HEIGHT.mobile}
+      >
         <ComposedChart
           data={data}
-          margin={{ top: 5, right: 10, left: 10, bottom: 0 }}
+          margin={{ top: 5, right: 0, left: 0, bottom: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
           <YAxis
             yAxisId="balance"
             tickFormatter={(v: number) => THOUSANDS.format(v)}
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 11 }}
+            width={44}
           />
           <YAxis
             yAxisId="wealth"
             orientation="right"
             tickFormatter={(v: number) => THOUSANDS.format(v)}
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 11 }}
+            width={44}
           />
           <Tooltip formatter={(value) => formatMoney(Number(value))} />
           <Legend />
@@ -120,9 +127,72 @@ function WealthChart({ months }: { months: OverviewMonth[] }) {
   );
 }
 
+function MonthValue({
+  label,
+  value,
+  strong,
+}: {
+  label: string;
+  value: number | null;
+  strong?: boolean;
+}) {
+  if (value == null) {
+    return null;
+  }
+  return (
+    <>
+      <dt className="text-slate-500">{label}</dt>
+      <dd
+        className={cn(
+          "text-right tabular-nums",
+          strong && "font-semibold",
+          value < 0 && "text-rose-700",
+        )}
+      >
+        {formatMoney(value)}
+      </dd>
+    </>
+  );
+}
+
+/** Telefon: na měsíc jedna karta s tím podstatným, detail po rozkliknutí měsíce. */
+function MonthCards({ months }: { months: OverviewMonth[] }) {
+  return (
+    <ul className="space-y-2 md:hidden">
+      {months.map((m) => (
+        <li key={m.month}>
+          <Link
+            to="/mesic/$month"
+            params={{ month: m.month }}
+            className="block rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm active:bg-brand-50"
+          >
+            <div className="flex items-baseline justify-between">
+              <span className="font-semibold text-brand-700">
+                {monthLabel(m.month)}
+              </span>
+              {m.paidRatio != null && (
+                <span className="text-xs text-slate-500">
+                  zaplaceno {Math.round(m.paidRatio * 100)} %
+                </span>
+              )}
+            </div>
+            <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5">
+              <MonthValue label="Příjmy" value={m.incomePlan} />
+              <MonthValue label="Výdaje" value={m.expensePlan} />
+              <MonthValue label="Bilance" value={m.balance} strong />
+              <MonthValue label="Majetek na konci" value={m.wealthEnd} strong />
+              <MonthValue label="Skutečný stav" value={m.actualWealth} />
+            </dl>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function MonthsTable({ months }: { months: OverviewMonth[] }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
       <table className="w-full min-w-[1100px] text-sm">
         <thead>
           <tr className="bg-brand-700 text-xs font-semibold tracking-wide text-white uppercase">
@@ -270,6 +340,7 @@ export function OverviewPage() {
         }
       />
       <WealthChart months={months} />
+      <MonthCards months={months} />
       <MonthsTable months={months} />
       <Matrix
         title="Výdaje podle kategorií (plán)"

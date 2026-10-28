@@ -99,7 +99,10 @@ const accountsConfig: CrudConfig<"accounts"> = {
     { label: "Instituce", render: (a) => a.institution },
     { label: "Majitel", render: (a) => a.owner },
     { label: "Typ", render: (a) => a.type },
-    { label: "Číslo účtu", render: (a) => <AccountNumber value={a.number} /> },
+    {
+      label: "Číslo účtu",
+      render: (a) => a.number && <AccountNumber value={a.number} />,
+    },
     {
       label: "Počáteční stav",
       align: "right",
@@ -157,8 +160,12 @@ const counterpartiesConfig: CrudConfig<"counterparties"> = {
       render: (c) => <span className="font-medium">{c.name}</span>,
     },
     { label: "Typ", render: (c) => c.type },
-    { label: "Účet", render: (c) => <AccountNumber value={c.accountNumber} /> },
-    { label: "Web", render: (c) => <WebLink url={c.web} /> },
+    {
+      label: "Účet",
+      render: (c) =>
+        c.accountNumber && <AccountNumber value={c.accountNumber} />,
+    },
+    { label: "Web", render: (c) => c.web && <WebLink url={c.web} /> },
     {
       label: "Poznámka",
       render: (c) => <span className="text-slate-500">{c.note}</span>,
@@ -249,7 +256,8 @@ function templatesConfig(
       },
       {
         label: "Účet",
-        render: (t) => <AccountNumber value={t.accountNumber} />,
+        render: (t) =>
+          t.accountNumber && <AccountNumber value={t.accountNumber} />,
       },
       { label: "VS", render: (t) => t.vs },
       {

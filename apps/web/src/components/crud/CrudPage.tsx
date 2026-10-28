@@ -263,6 +263,62 @@ function isSelectingText(): boolean {
   return (window.getSelection()?.toString() ?? "") !== "";
 }
 
+function isEmptyCell(content: ReactNode): boolean {
+  return content == null || content === false || content === "";
+}
+
+/** Telefon: karta s prvním sloupcem jako nadpisem a ostatními jako popisky. */
+function CrudCards<R extends Resource>({
+  config,
+  rows,
+  onOpen,
+}: {
+  config: CrudConfig<R>;
+  rows: Resources[R][];
+  onOpen: (row: Resources[R]) => void;
+}) {
+  const [titleColumn, ...detailColumns] = config.columns;
+  if (rows.length === 0) {
+    return (
+      <p className="rounded-xl bg-white p-4 text-center text-sm text-slate-500 md:hidden">
+        Nic nenalezeno
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-2 md:hidden">
+      {rows.map((row) => (
+        <li key={row.id}>
+          {/* biome-ignore lint/a11y/useSemanticElements: karta obsahuje odkazy a tlačítko kopírování, <button> je nesmí obalovat */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => !isSelectingText() && onOpen(row)}
+            onKeyDown={(event) => event.key === "Enter" && onOpen(row)}
+            className={cn(
+              "w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm active:bg-brand-50",
+              config.rowClassName?.(row),
+            )}
+          >
+            <div className="font-medium">{titleColumn?.render(row)}</div>
+            <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
+              {detailColumns.map((column) => {
+                const content = column.render(row);
+                return isEmptyCell(content) ? null : (
+                  <div key={column.label} className="contents">
+                    <dt className="text-slate-500">{column.label}</dt>
+                    <dd className="min-w-0 break-words">{content}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function CrudTable<R extends Resource>({
   config,
   rows,
@@ -273,59 +329,62 @@ function CrudTable<R extends Resource>({
   onOpen: (row: Resources[R]) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <table className="w-full min-w-[720px] text-sm">
-        <thead>
-          <tr className="bg-brand-700 text-left text-xs font-semibold tracking-wide text-white uppercase">
-            {config.columns.map((column) => (
-              <th
-                key={column.label}
-                className={cn(
-                  "px-3 py-2.5",
-                  column.align === "right" && "text-right",
-                )}
-              >
-                {column.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.id}
-              onClick={() => !isSelectingText() && onOpen(row)}
-              className={cn(
-                "cursor-pointer border-t border-slate-100 hover:bg-brand-50",
-                config.rowClassName?.(row),
-              )}
-            >
+    <>
+      <CrudCards config={config} rows={rows} onOpen={onOpen} />
+      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-brand-700 text-left text-xs font-semibold tracking-wide text-white uppercase">
               {config.columns.map((column) => (
-                <td
+                <th
                   key={column.label}
                   className={cn(
-                    "px-3 py-2 align-top",
-                    column.align === "right" && "text-right tabular-nums",
+                    "px-3 py-2.5",
+                    column.align === "right" && "text-right",
                   )}
                 >
-                  {column.render(row)}
-                </td>
+                  {column.label}
+                </th>
               ))}
             </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr>
-              <td
-                colSpan={config.columns.length}
-                className="px-3 py-6 text-center text-slate-500"
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                onClick={() => !isSelectingText() && onOpen(row)}
+                className={cn(
+                  "cursor-pointer border-t border-slate-100 hover:bg-brand-50",
+                  config.rowClassName?.(row),
+                )}
               >
-                Nic nenalezeno
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+                {config.columns.map((column) => (
+                  <td
+                    key={column.label}
+                    className={cn(
+                      "px-3 py-2 align-top",
+                      column.align === "right" && "text-right tabular-nums",
+                    )}
+                  >
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td
+                  colSpan={config.columns.length}
+                  className="px-3 py-6 text-center text-slate-500"
+                >
+                  Nic nenalezeno
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -366,7 +425,7 @@ export function CrudPage<R extends Resource>({
           </Button>
         }
       />
-      <div className="relative mb-3 max-w-sm">
+      <div className="relative mb-3 sm:max-w-sm">
         <Search className="pointer-events-none absolute top-3 left-3 size-4 text-slate-400" />
         <Input
           className="pl-9"

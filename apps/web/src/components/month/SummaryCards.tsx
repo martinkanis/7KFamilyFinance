@@ -23,7 +23,7 @@ function DirectionCard({
   summary: DirectionSummary;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="w-[85%] shrink-0 snap-center p-4 md:w-auto">
       <div className="text-sm font-medium text-slate-500">{title}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">
         {formatMoney(summary.plan)}
@@ -55,7 +55,8 @@ function DirectionCard({
 
 export function SummaryCards({ summary }: { summary: MonthSummary }) {
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    // Na telefonu vodorovný pás karet (posun prstem), od md mřížka.
+    <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 md:pb-0">
       <DirectionCard
         title="Výdaje"
         doneLabel="Zaplaceno"
@@ -66,7 +67,7 @@ export function SummaryCards({ summary }: { summary: MonthSummary }) {
         doneLabel="Přišlo"
         summary={summary.income}
       />
-      <Card className="p-4">
+      <Card className="w-[85%] shrink-0 snap-center p-4 md:w-auto">
         <div className="text-sm font-medium text-slate-500">Bilance (plán)</div>
         <div
           className={`mt-1 text-2xl font-semibold tabular-nums ${summary.balance < 0 ? "text-rose-700" : "text-emerald-700"}`}

@@ -7,17 +7,23 @@ import type {
 } from "@kkff/api/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useParams } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Plus, QrCode } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { type FormEvent, useRef, useState } from "react";
 import { AccountBreakdown } from "@/components/month/AccountBreakdown";
+import { EmptyMonth } from "@/components/month/EmptyMonth";
 import { EntryDialog } from "@/components/month/EntryDialog";
+import {
+  type Filters,
+  MonthToolbar,
+  NO_ACCOUNT,
+} from "@/components/month/MonthToolbar";
 import { OneOffDialog } from "@/components/month/OneOffDialog";
 import { PaymentTable } from "@/components/month/PaymentTable";
 import { QrPayDialog } from "@/components/month/QrPayDialog";
 import { SummaryCards } from "@/components/month/SummaryCards";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
-import { Checkbox, Field, Input, Select } from "@/components/ui/field";
+import { Field, Input } from "@/components/ui/field";
 import { operatingAccountsWith } from "@/lib/accounts";
 import { api } from "@/lib/api";
 import {
@@ -32,21 +38,16 @@ import {
   isPayable,
   itemEntryWithStatus,
   oneOffWithStatus,
+  withOptimisticStatus,
 } from "@/lib/monthRows";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
-const NO_ACCOUNT = "none";
+const MONTH_SAVE_KEY = "month-save";
 
 type Editing =
   | { kind: "entry"; row: MonthRow }
   | { kind: "oneOff"; row: MonthRow | null }
   | null;
-
-interface Filters {
-  showZero: boolean;
-  onlyOpen: boolean;
-  account: string;
-}
 
 function matchesFilters(row: MonthRow, filters: Filters): boolean {
   if (!filters.showZero && row.amount === 0 && row.entryId == null)
@@ -89,14 +90,32 @@ function saveOneOff(month: string, row: MonthRow | null, input: OneOffInput) {
     : api.createOneOff(month, input);
 }
 
+/**
+ * Uložení s čerstvým pohledem na měsíc. Při rychlém klikání by starší odpověď
+ * přepsala novější stav, proto se data převezmou až od poslední rozpracované
+ * změny (a když se mezitím nějaká odpověď přeskočila, měsíc se načte znovu).
+ */
 function useMonthMutation(month: string) {
   const queryClient = useQueryClient();
+  const skippedResponse = useRef(false);
+  const mutationKey = [MONTH_SAVE_KEY, month];
   return useMutation({
+    mutationKey,
     mutationFn: (save: () => Promise<MonthView>) => save(),
     onSuccess: (view) => {
-      queryClient.setQueryData(["month", month], view);
+      const isLastPending = queryClient.isMutating({ mutationKey }) <= 1;
+      if (!isLastPending) {
+        skippedResponse.current = true;
+      } else if (skippedResponse.current) {
+        skippedResponse.current = false;
+        void queryClient.invalidateQueries({ queryKey: ["month", month] });
+      } else {
+        queryClient.setQueryData(["month", month], view);
+      }
       void queryClient.invalidateQueries({ queryKey: ["overview"] });
     },
+    onError: () =>
+      void queryClient.invalidateQueries({ queryKey: ["month", month] }),
   });
 }
 
@@ -157,7 +176,10 @@ function CorrectionCard({
   return (
     <Card className="p-4">
       <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
-        <Field label="Korekce majetku (výnosy, přecenění…)" className="w-56">
+        <Field
+          label="Korekce majetku (výnosy, přecenění…)"
+          className="w-full sm:w-56"
+        >
           <Input
             inputMode="decimal"
             value={amount}
@@ -197,6 +219,7 @@ export function MonthPage() {
     queryKey: ["counterparties"],
     queryFn: () => api.list("counterparties"),
   });
+  const queryClient = useQueryClient();
   const save = useMonthMutation(month);
   const [filters, setFilters] = useState<Filters>({
     showZero: false,
@@ -226,8 +249,14 @@ export function MonthPage() {
     setEditing(null);
   };
 
-  const changeStatus = (row: MonthRow, status: PaymentStatus) =>
-    save.mutateAsync(() => saveStatus(month, row, status));
+  const changeStatus = (row: MonthRow, status: PaymentStatus) => {
+    queryClient.setQueryData<MonthView>(
+      ["month", month],
+      (current) =>
+        current && withOptimisticStatus(current, row.key, status, todayIso()),
+    );
+    return save.mutateAsync(() => saveStatus(month, row, status));
+  };
 
   const onSaveEntry = (row: MonthRow) => (input: EntryInput) =>
     save.mutate(() => saveItemEntry(month, row, input), {
@@ -253,7 +282,6 @@ export function MonthPage() {
 
   const tableProps = {
     today: todayIso(),
-    isSaving: save.isPending,
     onStatus: (row: MonthRow, status: PaymentStatus) =>
       void changeStatus(row, status),
     onEdit: (row: MonthRow) =>
@@ -274,45 +302,18 @@ export function MonthPage() {
       <SummaryCards summary={view.data.summary} />
       {save.error && !editing && <ErrorMessage error={save.error} />}
 
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-        <Button
-          variant="primary"
-          disabled={payableKeys.length === 0}
-          onClick={() => setQrQueue(payableKeys)}
-        >
-          <QrCode className="size-4" /> Platit přes QR ({payableKeys.length})
-        </Button>
-        <Button onClick={() => setEditing({ kind: "oneOff", row: null })}>
-          <Plus className="size-4" /> Jednorázová platba
-        </Button>
-        <div className="w-64">
-          <Select
-            aria-label="Filtrovat podle našeho účtu"
-            value={filters.account}
-            onChange={(e) =>
-              setFilters({ ...filters, account: e.target.value })
-            }
-          >
-            <option value="">Všechny naše účty</option>
-            {filterAccounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
-              </option>
-            ))}
-            <option value={NO_ACCOUNT}>Bez vyplněného účtu</option>
-          </Select>
-        </div>
-        <Checkbox
-          label="Jen nezaplacené"
-          checked={filters.onlyOpen}
-          onChange={(onlyOpen) => setFilters({ ...filters, onlyOpen })}
+      {view.data.rows.length === 0 ? (
+        <EmptyMonth />
+      ) : (
+        <MonthToolbar
+          payableCount={payableKeys.length}
+          filters={filters}
+          accounts={filterAccounts}
+          onFiltersChange={setFilters}
+          onPayByQr={() => setQrQueue(payableKeys)}
+          onAddOneOff={() => setEditing({ kind: "oneOff", row: null })}
         />
-        <Checkbox
-          label="Ukázat nulové"
-          checked={filters.showZero}
-          onChange={(showZero) => setFilters({ ...filters, showZero })}
-        />
-      </div>
+      )}
 
       <PaymentTable title="Výdaje" rows={expenses} {...tableProps} />
       <PaymentTable title="Příjmy" rows={incomes} {...tableProps} />

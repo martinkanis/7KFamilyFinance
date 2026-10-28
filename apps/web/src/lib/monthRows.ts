@@ -1,6 +1,7 @@
 import type {
   EntryInput,
   MonthRow,
+  MonthView,
   OneOffInput,
   PaymentStatus,
 } from "@kkff/api/contracts";
@@ -103,4 +104,21 @@ export function groupByCategory(rows: MonthRow[]): CategoryGroup[] {
     }
   }
   return groups;
+}
+
+/** Okamžitá změna stavu v zobrazení, než odpoví server (souhrny přepočítá server). */
+export function withOptimisticStatus(
+  view: MonthView,
+  rowKey: string,
+  status: PaymentStatus,
+  today: string,
+): MonthView {
+  return {
+    ...view,
+    rows: view.rows.map((row) =>
+      row.key === rowKey
+        ? { ...row, status, paidOn: status === "paid" ? today : null }
+        : row,
+    ),
+  };
 }

@@ -20,8 +20,11 @@ import {
   shortMonthLabel,
 } from "@/lib/format";
 import { parseOptionalNumber, toText } from "@/lib/formValues";
+import { DESKTOP_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
 
-const VISIBLE_MONTHS = 6;
+const VISIBLE_MONTHS_DESKTOP = 6;
+/** Na telefonu se vejdou dva sloupce: minulý a aktuální měsíc. */
+const VISIBLE_MONTHS_MOBILE = 2;
 
 type BalanceLookup = (accountId: number, month: string) => number | null;
 
@@ -39,9 +42,9 @@ function monthTotal(balances: AccountBalance[], month: string): number | null {
     : inMonth.reduce((sum, b) => sum + b.balance, 0);
 }
 
-function visibleMonths(lastMonth: string): string[] {
-  return Array.from({ length: VISIBLE_MONTHS }, (_, i) =>
-    addMonths(lastMonth, i - VISIBLE_MONTHS + 1),
+function visibleMonths(lastMonth: string, count: number): string[] {
+  return Array.from({ length: count }, (_, i) =>
+    addMonths(lastMonth, i - count + 1),
   );
 }
 
@@ -93,7 +96,8 @@ function BalanceCell({ value, disabled, onSave }: BalanceCellProps) {
       onBlur={commit}
       onKeyDown={onKeyDown}
       className={cn(
-        "w-28 rounded-md border bg-transparent px-2 py-1 text-right tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100",
+        // text-base na telefonu, jinak iOS při psaní přibližuje stránku
+        "w-24 rounded-md border bg-transparent px-2 py-1.5 text-right text-base tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100 sm:w-28 sm:py-1 sm:text-sm",
         error ? "border-rose-400" : "border-transparent hover:border-slate-300",
       )}
     />
@@ -194,6 +198,7 @@ function difference(a: number | null, b: number | null): number | null {
 export function SavingsPage() {
   const queryClient = useQueryClient();
   const [lastMonth, setLastMonth] = useState(currentMonth());
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const accounts = useQuery({
     queryKey: ["accounts"],
     queryFn: () => api.list("accounts"),
@@ -219,7 +224,10 @@ export function SavingsPage() {
     return <ErrorMessage error={accounts.error ?? balances.error} />;
   }
 
-  const months = visibleMonths(lastMonth);
+  const months = visibleMonths(
+    lastMonth,
+    isDesktop ? VISIBLE_MONTHS_DESKTOP : VISIBLE_MONTHS_MOBILE,
+  );
   const balanceOf = lookupOf(balances.data);
   const totals = months.map((month) => monthTotal(balances.data, month));
   const previousTotals = months.map((month) =>
@@ -260,16 +268,17 @@ export function SavingsPage() {
       />
       <div className="flex flex-wrap items-center gap-3">
         <Button
+          className="w-full sm:w-auto"
           disabled={toCopy.length === 0 || save.isPending}
           onClick={() => save.mutate({ month: lastMonth, inputs: toCopy })}
         >
           <Copy className="size-4" /> Předvyplnit {monthLabel(lastMonth)} z
-          předchozího měsíce ({toCopy.length})
+          minulého měsíce ({toCopy.length})
         </Button>
         {save.error && <ErrorMessage error={save.error} />}
       </div>
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full text-sm md:min-w-[760px]">
           <thead>
             <tr className="bg-brand-700 text-xs font-semibold tracking-wide text-white uppercase">
               <th className="sticky left-0 bg-brand-700 px-3 py-2.5 text-left">

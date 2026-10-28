@@ -1,8 +1,15 @@
-import type { PaymentStatus } from "@kkff/api/contracts";
+import type { Direction, PaymentStatus } from "@kkff/api/contracts";
 import { cn } from "@/lib/cn";
 import { STATUS_LABELS } from "@/lib/format";
 
-const OPTIONS: { status: PaymentStatus; short: string; active: string }[] = [
+interface StatusOption {
+  status: PaymentStatus;
+  /** Popisek v kompaktní tabulce (desktop). */
+  short: string;
+  active: string;
+}
+
+const OPTIONS: StatusOption[] = [
   { status: "unpaid", short: "Ne", active: "bg-rose-500 text-white" },
   {
     status: "processing",
@@ -12,22 +19,38 @@ const OPTIONS: { status: PaymentStatus; short: string; active: string }[] = [
   { status: "paid", short: "Ano", active: "bg-emerald-600 text-white" },
 ];
 
+/** Popisky velkého přepínače (telefon); u příjmu „Zaplaceno“ znamená „přišlo“. */
+function largeLabel(status: PaymentStatus, direction: Direction): string {
+  if (status === "paid") {
+    return direction === "income" ? "Přišlo" : "Zaplaceno";
+  }
+  return status === "processing" ? "Zpracovává" : "Ne";
+}
+
 interface StatusToggleProps {
   status: PaymentStatus;
+  direction: Direction;
+  size?: "compact" | "large";
   disabled?: boolean;
   onChange: (status: PaymentStatus) => void;
 }
 
 export function StatusToggle({
   status,
+  direction,
+  size = "compact",
   disabled,
   onChange,
 }: StatusToggleProps) {
+  const isLarge = size === "large";
   return (
     <div
       role="radiogroup"
       aria-label="Stav platby"
-      className="inline-flex overflow-hidden rounded-lg border border-slate-300 bg-white text-xs font-semibold"
+      className={cn(
+        "overflow-hidden rounded-lg border border-slate-300 bg-white font-semibold",
+        isLarge ? "flex text-sm" : "inline-flex text-xs",
+      )}
     >
       {OPTIONS.map((option) => {
         const isActive = option.status === status;
@@ -42,11 +65,14 @@ export function StatusToggle({
             disabled={disabled}
             onClick={() => !isActive && onChange(option.status)}
             className={cn(
-              "px-2 py-1 transition-colors",
-              isActive ? option.active : "text-slate-500 hover:bg-slate-100",
+              "transition-colors",
+              isLarge ? "flex-1 px-2 py-2.5" : "px-2 py-1",
+              isActive
+                ? option.active
+                : "text-slate-500 hover:bg-slate-100 active:bg-slate-200",
             )}
           >
-            {option.short}
+            {isLarge ? largeLabel(option.status, direction) : option.short}
           </button>
         );
       })}

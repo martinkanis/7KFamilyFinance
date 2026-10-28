@@ -6,8 +6,9 @@ import type {
 } from "react";
 import { cn } from "@/lib/cn";
 
+// Na mobilu 16 px – iOS jinak při kliknutí do pole přibližuje stránku.
 const CONTROL =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm " +
+  "w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 shadow-sm sm:text-sm " +
   "placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 " +
   "disabled:bg-slate-100";
 

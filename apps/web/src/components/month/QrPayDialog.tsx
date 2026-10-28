@@ -4,6 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Dialog } from "@/components/ui/dialog";
 import { formatDate, formatMoney, STATUS_LABELS } from "@/lib/format";
 import { spdOf } from "@/lib/monthRows";
@@ -23,17 +24,23 @@ interface QrPayDialogProps {
 function Detail({
   label,
   value,
+  copyValue,
 }: {
   label: string;
   value: string | null | undefined;
+  /** Text do schránky (např. částka bez „Kč“); bez něj se tlačítko nezobrazí. */
+  copyValue?: string | null;
 }) {
   if (!value) {
     return null;
   }
   return (
-    <div className="flex justify-between gap-4 border-b border-slate-100 py-1.5 text-sm">
+    <div className="flex items-center justify-between gap-4 border-b border-slate-100 py-1.5 text-sm">
       <dt className="text-slate-500">{label}</dt>
-      <dd className="text-right font-medium break-all">{value}</dd>
+      <dd className="flex items-center text-right font-medium break-all">
+        {value}
+        {copyValue && <CopyButton text={copyValue} label={label} />}
+      </dd>
     </div>
   );
 }
@@ -42,7 +49,8 @@ function PaymentQr({ row }: { row: MonthRow }) {
   const spd = spdOf(row);
   return (
     <div className="flex flex-col gap-5 sm:flex-row">
-      <div className="flex shrink-0 flex-col items-center gap-2">
+      {/* Na telefonu QR naskenovat nejde – údaje ke zkopírování jsou nahoře. */}
+      <div className="order-last flex shrink-0 flex-col items-center gap-2 sm:order-none">
         {spd.ok ? (
           <QRCodeSVG
             value={spd.spd}
@@ -68,13 +76,29 @@ function PaymentQr({ row }: { row: MonthRow }) {
       </div>
       <dl className="min-w-0 flex-1">
         <Detail label="Komu" value={row.counterparty?.name} />
-        <Detail label="Účet" value={row.counterpartyAccount} />
-        <Detail label="IBAN" value={spd.ok ? formatIban(spd.iban) : null} />
-        <Detail label="Částka" value={formatMoney(row.amount)} />
-        <Detail label="VS" value={row.vs} />
-        <Detail label="KS" value={row.ks} />
-        <Detail label="SS" value={row.ss} />
-        <Detail label="Zpráva" value={row.message ?? row.name} />
+        <Detail
+          label="Účet"
+          value={row.counterpartyAccount}
+          copyValue={row.counterpartyAccount}
+        />
+        <Detail
+          label="IBAN"
+          value={spd.ok ? formatIban(spd.iban) : null}
+          copyValue={spd.ok ? spd.iban : null}
+        />
+        <Detail
+          label="Částka"
+          value={formatMoney(row.amount)}
+          copyValue={String(row.amount)}
+        />
+        <Detail label="VS" value={row.vs} copyValue={row.vs} />
+        <Detail label="KS" value={row.ks} copyValue={row.ks} />
+        <Detail label="SS" value={row.ss} copyValue={row.ss} />
+        <Detail
+          label="Zpráva"
+          value={row.message ?? row.name}
+          copyValue={row.message ?? row.name}
+        />
         <Detail label="Splatnost" value={formatDate(row.dueDate)} />
         <Detail label="Zaplatit z" value={row.ourAccount?.name} />
         <Detail
@@ -116,16 +140,19 @@ export function QrPayDialog({
       onClose={onClose}
       title={row ? `${row.name} · ${index + 1} / ${queue.length}` : "QR platba"}
       footer={
-        <>
+        // Na telefonu nahoře stav (palcem), pod ním listování; na desktopu jedna řada.
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:items-center">
           <Button
             variant="ghost"
+            className="order-3 sm:order-none"
             disabled={index === 0}
             onClick={() => setIndex(index - 1)}
           >
             <ChevronLeft className="size-4" /> Předchozí
           </Button>
-          <div className="flex-1" />
+          <div className="hidden flex-1 sm:block" />
           <Button
+            className="order-1 sm:order-none"
             disabled={isSaving || !row}
             onClick={() => markAndContinue("processing")}
           >
@@ -133,6 +160,7 @@ export function QrPayDialog({
           </Button>
           <Button
             variant="primary"
+            className="order-2 sm:order-none"
             disabled={isSaving || !row}
             onClick={() => markAndContinue("paid")}
           >
@@ -140,12 +168,13 @@ export function QrPayDialog({
           </Button>
           <Button
             variant="ghost"
+            className="order-4 sm:order-none"
             disabled={!hasNext}
             onClick={() => setIndex(index + 1)}
           >
             Další <ChevronRight className="size-4" />
           </Button>
-        </>
+        </div>
       }
     >
       {row ? (
