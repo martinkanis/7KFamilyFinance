@@ -35,7 +35,7 @@ function Navigation({ username }: { username: string }) {
           className="flex shrink-0 items-center gap-2 font-semibold text-brand-700"
         >
           <img src="/favicon.svg" alt="" className="size-7" />
-          <span className="hidden sm:inline">EK Family Finance</span>
+          <span className="hidden sm:inline">7KFamilyFinance</span>
         </Link>
         <nav className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
           <Link

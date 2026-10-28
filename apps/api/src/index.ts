@@ -21,4 +21,4 @@ if (configuredUserCount() === 0) {
 }
 
 app.listen(config.port);
-console.log(`EK Family Finance běží na portu ${config.port}`);
+console.log(`7KFamilyFinance běží na portu ${config.port}`);
