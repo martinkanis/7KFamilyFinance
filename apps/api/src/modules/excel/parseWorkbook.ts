@@ -435,13 +435,20 @@ function requireSheets(wb: ExcelJS.Workbook): void {
   }
 }
 
-export async function parseWorkbook(buffer: ArrayBuffer): Promise<ImportData> {
+export async function loadWorkbook(
+  buffer: ArrayBuffer,
+): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
   try {
     await wb.xlsx.load(buffer);
   } catch {
     throw new WorkbookFormatError("Soubor se nepodařilo přečíst jako .xlsx");
   }
+  return wb;
+}
+
+export async function parseWorkbook(buffer: ArrayBuffer): Promise<ImportData> {
+  const wb = await loadWorkbook(buffer);
   requireSheets(wb);
   const warnings: string[] = [];
   const startCell = wb.getWorksheet(SHEETS.accounts)?.getCell(START_DATE_CELL);

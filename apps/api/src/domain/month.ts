@@ -31,6 +31,24 @@ export function monthNumber(key: string): number {
   return parseMonthKey(key).month;
 }
 
+function monthIndex(key: string): number {
+  const { year, month } = parseMonthKey(key);
+  return year * 12 + month - 1;
+}
+
+/** Měsíc s daným číslem (1–12) nejblíž referenčnímu; při shodě ten dřívější. */
+export function nearestMonthKey(month: number, reference: string): string {
+  const { year } = parseMonthKey(reference);
+  const distance = (key: string) =>
+    Math.abs(monthIndex(key) - monthIndex(reference));
+  const candidates = [year - 1, year, year + 1].map((y) =>
+    toMonthKey(y, month),
+  );
+  return candidates.reduce((best, key) =>
+    distance(key) < distance(best) ? key : best,
+  );
+}
+
 export function addMonths(key: string, delta: number): string {
   const { year, month } = parseMonthKey(key);
   const zeroBased = year * 12 + (month - 1) + delta;

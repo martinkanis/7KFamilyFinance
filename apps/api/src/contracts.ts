@@ -106,6 +106,29 @@ export interface BalanceInput {
   balance: number | null;
 }
 
+/** Řádek bloku „Stávající stav“ z Excelu; navržený účet je null, když se žádný název nepodobá. */
+export interface ExcelBalanceRow {
+  label: string;
+  balance: number;
+  suggestedAccountId: number | null;
+}
+
+/** Blok „Stávající stav“ jednoho měsíce z původního Excelu (např. „říjen“). */
+export interface ExcelBalanceBlock {
+  title: string;
+  month: string;
+  rows: ExcelBalanceRow[];
+}
+
+/** Id účtu, nebo „new“ = založit spořicí účet pojmenovaný podle řádku. */
+export type BalanceTarget = number | "new";
+
+export interface ExcelBalanceAssignment {
+  label: string;
+  balance: number;
+  target: BalanceTarget;
+}
+
 /** Hodnoty přepsané jen pro jeden měsíc (null = výchozí z položky). */
 export interface MonthOverrides {
   amount: number | null;

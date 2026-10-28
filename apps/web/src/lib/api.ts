@@ -6,6 +6,8 @@ import type {
   Counterparty,
   CurrentUser,
   EntryInput,
+  ExcelBalanceAssignment,
+  ExcelBalanceBlock,
   ImportResult,
   InsurancePolicy,
   Item,
@@ -102,6 +104,17 @@ export const api = {
   balances: () => request<AccountBalance[]>("GET", "/api/balances"),
   saveBalances: (month: string, inputs: BalanceInput[]) =>
     request<AccountBalance[]>("PUT", `/api/balances/${month}`, inputs),
+  previewExcelBalances: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<ExcelBalanceBlock[]>("POST", "/api/balances/excel", form);
+  },
+  applyExcelBalances: (month: string, assignments: ExcelBalanceAssignment[]) =>
+    request<AccountBalance[]>(
+      "PUT",
+      `/api/balances/${month}/excel`,
+      assignments,
+    ),
   settings: () => request<Settings>("GET", "/api/settings"),
   saveSettings: (settings: Settings) =>
     request<Settings>("PUT", "/api/settings", settings),

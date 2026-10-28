@@ -6,8 +6,9 @@ import type {
   OverviewMonth,
 } from "@kkff/api/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, FileSpreadsheet } from "lucide-react";
 import { type KeyboardEvent, useState } from "react";
+import { ExcelBalancesDialog } from "@/components/savings/ExcelBalancesDialog";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
 import { api } from "@/lib/api";
@@ -198,6 +199,7 @@ function difference(a: number | null, b: number | null): number | null {
 export function SavingsPage() {
   const queryClient = useQueryClient();
   const [lastMonth, setLastMonth] = useState(currentMonth());
+  const [isImporting, setImporting] = useState(false);
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const accounts = useQuery({
     queryKey: ["accounts"],
@@ -238,6 +240,13 @@ export function SavingsPage() {
   );
   const plans = months.map((month) => planOf.get(month)?.wealthEnd ?? null);
   const toCopy = copyFromPrevious(accounts.data, lastMonth, balanceOf);
+  const onExcelApplied = (month: string, saved: AccountBalance[]) => {
+    queryClient.setQueryData(["balances"], saved);
+    void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+    void queryClient.invalidateQueries({ queryKey: ["overview"] });
+    setLastMonth(month);
+    setImporting(false);
+  };
 
   return (
     <div className="space-y-4">
@@ -274,6 +283,9 @@ export function SavingsPage() {
         >
           <Copy className="size-4" /> Předvyplnit {monthLabel(lastMonth)} z
           minulého měsíce ({toCopy.length})
+        </Button>
+        <Button className="w-full sm:w-auto" onClick={() => setImporting(true)}>
+          <FileSpreadsheet className="size-4" /> Načíst z Excelu
         </Button>
         {save.error && <ErrorMessage error={save.error} />}
       </div>
@@ -360,6 +372,13 @@ export function SavingsPage() {
           </tfoot>
         </table>
       </div>
+      {isImporting && (
+        <ExcelBalancesDialog
+          accounts={accounts.data}
+          onApplied={onExcelApplied}
+          onClose={() => setImporting(false)}
+        />
+      )}
     </div>
   );
 }

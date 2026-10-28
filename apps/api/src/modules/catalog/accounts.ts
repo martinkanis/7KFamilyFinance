@@ -1,7 +1,7 @@
 import { asc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
 import type { Account } from "../../contracts.ts";
-import { db } from "../../db/index.ts";
+import { db, type Executor } from "../../db/index.ts";
 import { accounts } from "../../db/schema.ts";
 import { notFound, withDbErrors } from "../../lib/errors.ts";
 import { firstOrThrow, normalizeTexts } from "../../lib/normalize.ts";
@@ -27,8 +27,8 @@ const accountBody = t.Object({
 
 const ENTITY = "Účet";
 
-async function nextSortOrder(): Promise<number> {
-  const [row] = await db
+export async function nextSortOrder(executor: Executor = db): Promise<number> {
+  const [row] = await executor
     .select({ max: sql<number>`coalesce(max(${accounts.sortOrder}), 0)` })
     .from(accounts);
   return Number(row?.max ?? 0) + 1;

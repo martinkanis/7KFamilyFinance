@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
+import { suggestAccount } from "./accountMatch.ts";
 import { defaultKindForType, normalizeAccountType } from "./accountTypes.ts";
 import { actualWealthByMonth } from "./balances.ts";
-import { addMonths, dueDateIn, monthRange } from "./month.ts";
+import { addMonths, dueDateIn, monthRange, nearestMonthKey } from "./month.ts";
 import {
   breakdownByAccount,
   buildMonthRows,
@@ -47,6 +48,12 @@ describe("měsíce", () => {
       "2026-12",
       "2027-01",
     ]);
+  });
+  it("k číslu měsíce najde nejbližší rok, při shodě ten dřívější", () => {
+    expect(nearestMonthKey(10, "2026-10")).toBe("2026-10");
+    expect(nearestMonthKey(1, "2026-11")).toBe("2027-01");
+    expect(nearestMonthKey(12, "2027-01")).toBe("2026-12");
+    expect(nearestMonthKey(4, "2026-10")).toBe("2026-04");
   });
 });
 
@@ -247,5 +254,25 @@ describe("typy účtů", () => {
     expect(defaultKindForType("Hotovost")).toBe("operating");
     expect(defaultKindForType("Stavební spoření")).toBe("savings");
     expect(defaultKindForType(null)).toBe("savings");
+  });
+});
+
+describe("návrh účtu k popisku z Excelu", () => {
+  const accounts = [
+    { id: 1, name: "Portu" },
+    { id: 2, name: "Air – Já (Jan)" },
+    { id: 3, name: "Air Spoření – Já – Volné" },
+    { id: 4, name: "Raiffka – stavební spoření" },
+  ];
+
+  it("nezáleží na pořadí slov, pomlčkách, diakritice ani zkratkách", () => {
+    expect(suggestAccount("Air Já", accounts)).toBe(2);
+    expect(suggestAccount("Air spoření - já - volne", accounts)).toBe(3);
+    expect(suggestAccount("Raifka - stavebko", accounts)).toBe(4);
+  });
+
+  it("když se shoduje jen polovina slov, nic nenavrhne", () => {
+    expect(suggestAccount("Petra Portu", accounts)).toBeNull();
+    expect(suggestAccount("Hotovost", accounts)).toBeNull();
   });
 });

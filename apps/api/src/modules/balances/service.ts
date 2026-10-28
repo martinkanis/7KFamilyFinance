@@ -36,17 +36,24 @@ function saveBalance(executor: Executor, month: string, input: BalanceInput) {
     });
 }
 
+/** Zapíše zůstatky jednoho měsíce; volající řídí transakci. */
+export async function writeMonthBalances(
+  executor: Executor,
+  month: string,
+  inputs: BalanceInput[],
+): Promise<void> {
+  for (const input of inputs) {
+    await saveBalance(executor, month, input);
+  }
+}
+
 /** Uloží zůstatky jednoho měsíce (jeden i víc účtů najednou) a vrátí všechny. */
 export async function saveMonthBalances(
   month: string,
   inputs: BalanceInput[],
 ): Promise<AccountBalance[]> {
   await withDbErrors(ENTITY, () =>
-    db.transaction(async (tx) => {
-      for (const input of inputs) {
-        await saveBalance(tx, month, input);
-      }
-    }),
+    db.transaction((tx) => writeMonthBalances(tx, month, inputs)),
   );
   return loadBalances();
 }
