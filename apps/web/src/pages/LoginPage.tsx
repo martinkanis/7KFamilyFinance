@@ -28,7 +28,7 @@ export function LoginPage() {
         <div className="flex items-center gap-3">
           <img src="/favicon.svg" alt="" className="size-10" />
           <div>
-            <h1 className="text-lg font-semibold">KK Family Finance</h1>
+            <h1 className="text-lg font-semibold">EK Family Finance</h1>
             <p className="text-sm text-slate-500">Rodinné finance</p>
           </div>
         </div>

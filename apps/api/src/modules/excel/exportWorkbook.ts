@@ -427,7 +427,7 @@ function writeInsuranceSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
 
 export function buildExportWorkbook(input: ExportInput): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "KK Family Finance";
+  wb.creator = "EK Family Finance";
   wb.created = new Date();
   writeOverviewSheet(wb, input.overview);
   const accountNames = nameById(input.catalog.accounts);

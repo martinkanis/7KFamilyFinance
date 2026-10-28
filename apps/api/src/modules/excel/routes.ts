@@ -21,7 +21,7 @@ async function exportWorkbook(): Promise<Response> {
   ]);
   const workbook = buildExportWorkbook({ ...snapshot, insurance });
   const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `KKFamilyFinance-${todayInPrague()}.xlsx`;
+  const filename = `EKFamilyFinance-${todayInPrague()}.xlsx`;
   return new Response(buffer, {
     headers: {
       "content-type": XLSX_TYPE,
