@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./contracts": "./src/contracts.ts"
+    "./contracts": "./src/contracts.ts",
+    "./accountTypes": "./src/domain/accountTypes.ts"
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",

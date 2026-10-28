@@ -20,7 +20,7 @@ const accountBody = t.Object({
   number: nullableText(64),
   currency: t.String({ pattern: "^[A-Z]{3}$" }),
   initialBalance: moneySchema,
-  paymentAccount: t.Boolean(),
+  kind: t.Union([t.Literal("operating"), t.Literal("savings")]),
   note: nullableText(2000),
   sortOrder: t.Optional(t.Integer()),
 });

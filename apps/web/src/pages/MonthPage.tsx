@@ -18,7 +18,7 @@ import { SummaryCards } from "@/components/month/SummaryCards";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
 import { Checkbox, Field, Input, Select } from "@/components/ui/field";
-import { paymentAccountsWith } from "@/lib/accounts";
+import { operatingAccountsWith } from "@/lib/accounts";
 import { api } from "@/lib/api";
 import {
   addMonths,
@@ -217,7 +217,7 @@ export function MonthPage() {
   const incomes = rows.filter((row) => row.direction === "income");
   const payableKeys = expenses.filter(isPayable).map((row) => row.key);
   const categories = [...new Set(view.data.rows.map((row) => row.category))];
-  const filterAccounts = paymentAccountsWith(
+  const filterAccounts = operatingAccountsWith(
     accounts.data ?? [],
     view.data.rows.map((row) => row.ourAccount?.id),
   );

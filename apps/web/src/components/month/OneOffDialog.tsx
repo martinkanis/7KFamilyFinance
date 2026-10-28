@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorMessage } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
-import { paymentAccountsWith } from "@/lib/accounts";
+import { operatingAccountsWith } from "@/lib/accounts";
 import {
   idOrNull,
   parseOptionalDay,
@@ -199,7 +199,7 @@ export function OneOffDialog({
           >
             <option value="">—</option>
             <AccountOptions
-              accounts={paymentAccountsWith(accounts, [
+              accounts={operatingAccountsWith(accounts, [
                 row?.overrides.ourAccountId,
               ])}
             />

@@ -7,6 +7,7 @@ import type {
   Overview,
   Settings,
 } from "../../contracts.ts";
+import { ACCOUNT_KIND_LABELS } from "../../domain/accountTypes.ts";
 import { firstDayOf } from "../../domain/month.ts";
 import type { PlannerCatalog } from "../../domain/planner.ts";
 import { monthTitle, writeMonthSheet } from "./exportMonth.ts";
@@ -287,7 +288,7 @@ function writeAccountsSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
     "Měna",
     "Počáteční stav (Kč)",
     "Poznámka",
-    "Platební účet",
+    "Druh",
   ]);
   writeRows(
     sheet,
@@ -301,7 +302,7 @@ function writeAccountsSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
       a.currency,
       a.initialBalance,
       a.note,
-      yesNo(a.paymentAccount),
+      ACCOUNT_KIND_LABELS[a.kind],
     ]),
   );
   for (

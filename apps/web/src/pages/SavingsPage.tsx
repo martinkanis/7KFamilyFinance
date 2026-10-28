@@ -1,6 +1,7 @@
 import type {
   Account,
   AccountBalance,
+  AccountKind,
   BalanceInput,
   OverviewMonth,
 } from "@kkff/api/contracts";
@@ -130,6 +131,62 @@ function SummaryRow({
   );
 }
 
+const ACCOUNT_KINDS: AccountKind[] = ["operating", "savings"];
+
+const KIND_TITLES: Record<AccountKind, string> = {
+  operating: "Provozní účty",
+  savings: "Spořicí účty",
+};
+
+function groupTotal(
+  group: Account[],
+  month: string,
+  balanceOf: BalanceLookup,
+): number | null {
+  const values = group
+    .map((account) => balanceOf(account.id, month))
+    .filter((value): value is number => value != null);
+  return values.length === 0 ? null : values.reduce((sum, v) => sum + v, 0);
+}
+
+function AccountBalanceRow({
+  account,
+  months,
+  balanceOf,
+  disabled,
+  onSave,
+}: {
+  account: Account;
+  months: string[];
+  balanceOf: BalanceLookup;
+  disabled: boolean;
+  onSave: (month: string, balance: number | null) => void;
+}) {
+  return (
+    <tr className="border-t border-slate-100 hover:bg-brand-50/50">
+      <td className="sticky left-0 bg-white px-3 py-1.5">
+        <div className="font-medium">{account.name}</div>
+        <div className="text-xs text-slate-500">
+          {[account.owner, account.type].filter(Boolean).join(" · ")}
+        </div>
+      </td>
+      {months.map((month) => {
+        const value = balanceOf(account.id, month);
+        return (
+          <td key={month} className="px-1 py-1 text-right">
+            <BalanceCell
+              key={`${account.id}-${month}-${value}`}
+              value={value}
+              disabled={disabled}
+              onSave={(balance) => onSave(month, balance)}
+            />
+          </td>
+        );
+      })}
+    </tr>
+  );
+}
+
 function difference(a: number | null, b: number | null): number | null {
   return a == null || b == null ? null : a - b;
 }
@@ -228,39 +285,43 @@ export function SavingsPage() {
               ))}
             </tr>
           </thead>
-          <tbody>
-            {accounts.data.map((account) => (
-              <tr
-                key={account.id}
-                className="border-t border-slate-100 hover:bg-brand-50/50"
-              >
-                <td className="sticky left-0 bg-white px-3 py-1.5">
-                  <div className="font-medium">{account.name}</div>
-                  <div className="text-xs text-slate-500">
-                    {[account.owner, account.type].filter(Boolean).join(" · ")}
-                  </div>
-                </td>
-                {months.map((month) => {
-                  const value = balanceOf(account.id, month);
-                  return (
-                    <td key={month} className="px-1 py-1 text-right">
-                      <BalanceCell
-                        key={`${account.id}-${month}-${value}`}
-                        value={value}
-                        disabled={save.isPending}
-                        onSave={(balance) =>
-                          save.mutate({
-                            month,
-                            inputs: [{ accountId: account.id, balance }],
-                          })
-                        }
-                      />
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
+          {ACCOUNT_KINDS.map((kind) => {
+            const group = accounts.data.filter((a) => a.kind === kind);
+            return (
+              <tbody key={kind}>
+                <tr className="bg-brand-50">
+                  <td
+                    colSpan={months.length + 1}
+                    className="sticky left-0 px-3 py-1.5 text-sm font-semibold text-brand-700"
+                  >
+                    {KIND_TITLES[kind]}
+                  </td>
+                </tr>
+                {group.map((account) => (
+                  <AccountBalanceRow
+                    key={account.id}
+                    account={account}
+                    months={months}
+                    balanceOf={balanceOf}
+                    disabled={save.isPending}
+                    onSave={(month, balance) =>
+                      save.mutate({
+                        month,
+                        inputs: [{ accountId: account.id, balance }],
+                      })
+                    }
+                  />
+                ))}
+                <SummaryRow
+                  label={`Mezisoučet – ${KIND_TITLES[kind].toLowerCase()}`}
+                  months={months}
+                  values={months.map((month) =>
+                    groupTotal(group, month, balanceOf),
+                  )}
+                />
+              </tbody>
+            );
+          })}
           <tfoot>
             <SummaryRow
               label="Celkem (skutečnost)"

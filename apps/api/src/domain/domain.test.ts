@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { defaultKindForType, normalizeAccountType } from "./accountTypes.ts";
 import { actualWealthByMonth } from "./balances.ts";
 import { addMonths, dueDateIn, monthRange } from "./month.ts";
 import {
@@ -235,5 +236,16 @@ describe("skutečný stav účtů", () => {
       ["2026-10", 300.3],
       ["2026-11", 50],
     ]);
+  });
+});
+
+describe("typy účtů", () => {
+  it("převede starší názvy typů a odvodí druh účtu", () => {
+    expect(normalizeAccountType("Běžný účet")).toBe("Bankovní účet");
+    expect(normalizeAccountType("Investice")).toBe("Investice");
+    expect(defaultKindForType("Běžný účet")).toBe("operating");
+    expect(defaultKindForType("Hotovost")).toBe("operating");
+    expect(defaultKindForType("Stavební spoření")).toBe("savings");
+    expect(defaultKindForType(null)).toBe("savings");
   });
 });

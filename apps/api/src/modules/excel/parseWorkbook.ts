@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import type {
   AccountInput,
+  AccountKind,
   CounterpartyInput,
   Direction,
   InsurancePolicyInput,
@@ -8,6 +9,11 @@ import type {
   PaymentStatus,
   TemplateInput,
 } from "../../contracts.ts";
+import {
+  ACCOUNT_KIND_LABELS,
+  defaultKindForType,
+  normalizeAccountType,
+} from "../../domain/accountTypes.ts";
 import { monthKeyOfDate } from "../../domain/month.ts";
 import { parseDueMonths } from "../../domain/schedule.ts";
 import { dateOf, formulaOf, isYes, numberOf, textOf } from "./cells.ts";
@@ -140,14 +146,16 @@ function uniqueBy<T>(
   });
 }
 
-const CURRENT_ACCOUNT_TYPE_PREFIX = "běžný";
-
-/** Starší sešity sloupec „Platební účet“ nemají – pak se platí z běžných účtů. */
-function isPaymentAccount(cell: ExcelJS.Cell, type: string | null): boolean {
-  if (textOf(cell) != null) {
-    return isYes(cell);
+/** Druh účtu ze sloupce „Druh“; starší sešity ho nemají (nebo mají Ano/Ne) – pak podle typu. */
+function accountKindOf(cell: ExcelJS.Cell, type: string | null): AccountKind {
+  const label = reverseLabel(ACCOUNT_KIND_LABELS, textOf(cell));
+  if (label) {
+    return label;
   }
-  return type?.toLowerCase().startsWith(CURRENT_ACCOUNT_TYPE_PREFIX) ?? false;
+  if (textOf(cell) != null) {
+    return isYes(cell) ? "operating" : "savings";
+  }
+  return defaultKindForType(type);
 }
 
 function parseAccounts(wb: ExcelJS.Workbook): AccountInput[] {
@@ -157,12 +165,9 @@ function parseAccounts(wb: ExcelJS.Workbook): AccountInput[] {
     name: textOf(cell(c.name)) ?? "",
     institution: textOf(cell(c.institution)),
     owner: textOf(cell(c.owner)),
-    type: textOf(cell(c.type)),
+    type: normalizeAccountType(textOf(cell(c.type))),
     number: textOf(cell(c.number)),
-    paymentAccount: isPaymentAccount(
-      cell(c.paymentAccount),
-      textOf(cell(c.type)),
-    ),
+    kind: accountKindOf(cell(c.kind), textOf(cell(c.type))),
     currency: textOf(cell(c.currency))?.toUpperCase() ?? "CZK",
     initialBalance: numberOf(cell(c.initialBalance)) ?? 0,
     note: textOf(cell(c.note)),

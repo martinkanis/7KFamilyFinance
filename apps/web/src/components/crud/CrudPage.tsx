@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search } from "lucide-react";
+import { Copy, Plus, Search } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import {
   type FieldDef,
   type FormValues,
   formFromRow,
+  optionsFor,
   toPayload,
 } from "./fields";
 
@@ -25,6 +26,13 @@ export interface ColumnDef<T> {
   label: string;
   render: (row: T) => ReactNode;
   align?: "right";
+}
+
+/** Samostatná tabulka na stránce (např. provozní × spořicí účty). */
+export interface CrudSection<T> {
+  title: string;
+  description?: string;
+  includes: (row: T) => boolean;
 }
 
 export interface CrudConfig<R extends Resource> {
@@ -35,19 +43,32 @@ export interface CrudConfig<R extends Resource> {
   columns: ColumnDef<Resources[R]>[];
   fields: FieldDef<Resources[R]>[];
   defaults?: FormValues;
+  sections?: CrudSection<Resources[R]>[];
+  /** Unikátní pole, kterým kopie dostane příponu „(kopie)“. */
+  copySuffixKeys?: (keyof Resources[R] & string)[];
   searchText: (row: Resources[R]) => string;
   rowClassName?: (row: Resources[R]) => string;
 }
 
+interface Editing<T> {
+  /** Mění se s každým otevřením, aby formulář začal s čerstvými hodnotami. */
+  key: number;
+  row: T | null;
+  initial: FormValues;
+}
+
+const COPY_SUFFIX = " (kopie)";
+
 function FieldControl<T>({
   field,
-  value,
+  values,
   onChange,
 }: {
   field: FieldDef<T>;
-  value: string | boolean;
+  values: FormValues;
   onChange: (value: string | boolean) => void;
 }) {
+  const value = values[field.key] ?? "";
   if (field.kind === "checkbox") {
     return (
       <Checkbox
@@ -58,6 +79,7 @@ function FieldControl<T>({
     );
   }
   const text = typeof value === "string" ? value : "";
+  const options = optionsFor(field, values, text);
   const listId = `${field.key}-options`;
   return (
     <Field
@@ -71,7 +93,7 @@ function FieldControl<T>({
       {field.kind === "select" && (
         <Select value={text} onChange={(e) => onChange(e.target.value)}>
           {!field.required && <option value="">—</option>}
-          {field.options?.map((option) => (
+          {options.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -87,7 +109,7 @@ function FieldControl<T>({
             placeholder={field.placeholder}
           />
           <datalist id={listId}>
-            {field.options?.map((option) => (
+            {options.map((option) => (
               <option key={option.value} value={option.value} />
             ))}
           </datalist>
@@ -112,21 +134,31 @@ function FieldControl<T>({
   );
 }
 
+function copyOf<R extends Resource>(
+  config: CrudConfig<R>,
+  values: FormValues,
+): FormValues {
+  const copy = { ...values };
+  for (const key of config.copySuffixKeys ?? []) {
+    copy[key] = `${values[key] ?? ""}${COPY_SUFFIX}`;
+  }
+  return copy;
+}
+
 function EditDialog<R extends Resource>({
   config,
-  row,
+  editing,
+  onCopy,
   onClose,
 }: {
   config: CrudConfig<R>;
-  row: Resources[R] | null;
+  editing: Editing<Resources[R]>;
+  onCopy: (values: FormValues) => void;
   onClose: () => void;
 }) {
+  const { row } = editing;
   const queryClient = useQueryClient();
-  const [values, setValues] = useState<FormValues>(() =>
-    row
-      ? formFromRow(config.fields, row)
-      : emptyForm(config.fields, config.defaults),
-  );
+  const [values, setValues] = useState<FormValues>(editing.initial);
   const [formError, setFormError] = useState<string | null>(null);
   const onSuccess = () => {
     void queryClient.invalidateQueries();
@@ -182,6 +214,14 @@ function EditDialog<R extends Resource>({
               Smazat
             </Button>
           )}
+          {row && (
+            <Button
+              onClick={() => onCopy(copyOf(config, values))}
+              title="Otevře nový záznam se stejnými hodnotami"
+            >
+              <Copy className="size-4" /> Kopírovat
+            </Button>
+          )}
           <div className="flex-1" />
           <Button onClick={onClose}>Zrušit</Button>
           <Button
@@ -204,7 +244,7 @@ function EditDialog<R extends Resource>({
           <FieldControl
             key={field.key}
             field={field}
-            value={values[field.key] ?? ""}
+            values={values}
             onChange={(value) => setValues({ ...values, [field.key]: value })}
           />
         ))}
@@ -218,6 +258,77 @@ function EditDialog<R extends Resource>({
   );
 }
 
+/** Klik na řádek otevře úpravu – ne ale, když uživatel jen označuje text ke zkopírování. */
+function isSelectingText(): boolean {
+  return (window.getSelection()?.toString() ?? "") !== "";
+}
+
+function CrudTable<R extends Resource>({
+  config,
+  rows,
+  onOpen,
+}: {
+  config: CrudConfig<R>;
+  rows: Resources[R][];
+  onOpen: (row: Resources[R]) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <table className="w-full min-w-[720px] text-sm">
+        <thead>
+          <tr className="bg-brand-700 text-left text-xs font-semibold tracking-wide text-white uppercase">
+            {config.columns.map((column) => (
+              <th
+                key={column.label}
+                className={cn(
+                  "px-3 py-2.5",
+                  column.align === "right" && "text-right",
+                )}
+              >
+                {column.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={row.id}
+              onClick={() => !isSelectingText() && onOpen(row)}
+              className={cn(
+                "cursor-pointer border-t border-slate-100 hover:bg-brand-50",
+                config.rowClassName?.(row),
+              )}
+            >
+              {config.columns.map((column) => (
+                <td
+                  key={column.label}
+                  className={cn(
+                    "px-3 py-2 align-top",
+                    column.align === "right" && "text-right tabular-nums",
+                  )}
+                >
+                  {column.render(row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr>
+              <td
+                colSpan={config.columns.length}
+                className="px-3 py-6 text-center text-slate-500"
+              >
+                Nic nenalezeno
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function CrudPage<R extends Resource>({
   config,
 }: {
@@ -228,12 +339,16 @@ export function CrudPage<R extends Resource>({
     queryFn: () => api.list(config.resource),
   });
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<Resources[R] | "new" | null>(null);
+  const [editing, setEditing] = useState<Editing<Resources[R]> | null>(null);
 
   const needle = search.trim().toLowerCase();
   const rows = (list.data ?? []).filter((row) =>
     config.searchText(row).toLowerCase().includes(needle),
   );
+  const open = (row: Resources[R] | null, initial: FormValues) =>
+    setEditing({ key: Date.now(), row, initial });
+  const openRow = (row: Resources[R]) =>
+    open(row, formFromRow(config.fields, row));
 
   return (
     <div>
@@ -241,7 +356,12 @@ export function CrudPage<R extends Resource>({
         title={config.title}
         description={config.description}
         actions={
-          <Button variant="primary" onClick={() => setEditing("new")}>
+          <Button
+            variant="primary"
+            onClick={() =>
+              open(null, emptyForm(config.fields, config.defaults))
+            }
+          >
             <Plus className="size-4" /> Přidat
           </Button>
         }
@@ -257,65 +377,31 @@ export function CrudPage<R extends Resource>({
       </div>
       {list.isPending && <Loading />}
       {list.error && <ErrorMessage error={list.error} />}
-      {list.data && (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="bg-brand-700 text-left text-xs font-semibold tracking-wide text-white uppercase">
-                {config.columns.map((column) => (
-                  <th
-                    key={column.label}
-                    className={cn(
-                      "px-3 py-2.5",
-                      column.align === "right" && "text-right",
-                    )}
-                  >
-                    {column.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => setEditing(row)}
-                  className={cn(
-                    "cursor-pointer border-t border-slate-100 hover:bg-brand-50",
-                    config.rowClassName?.(row),
-                  )}
-                >
-                  {config.columns.map((column) => (
-                    <td
-                      key={column.label}
-                      className={cn(
-                        "px-3 py-2 align-top",
-                        column.align === "right" && "text-right tabular-nums",
-                      )}
-                    >
-                      {column.render(row)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={config.columns.length}
-                    className="px-3 py-6 text-center text-slate-500"
-                  >
-                    Nic nenalezeno
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      {list.data && !config.sections && (
+        <CrudTable config={config} rows={rows} onOpen={openRow} />
       )}
+      {list.data &&
+        config.sections?.map((section) => (
+          <section key={section.title} className="mb-6">
+            <h2 className="text-lg font-semibold">{section.title}</h2>
+            {section.description && (
+              <p className="mb-2 text-sm text-slate-500">
+                {section.description}
+              </p>
+            )}
+            <CrudTable
+              config={config}
+              rows={rows.filter(section.includes)}
+              onOpen={openRow}
+            />
+          </section>
+        ))}
       {editing && (
         <EditDialog
+          key={editing.key}
           config={config}
-          row={editing === "new" ? null : editing}
+          editing={editing}
+          onCopy={(values) => open(null, values)}
           onClose={() => setEditing(null)}
         />
       )}

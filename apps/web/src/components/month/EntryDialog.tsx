@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorMessage } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
-import { paymentAccountsWith } from "@/lib/accounts";
+import { operatingAccountsWith } from "@/lib/accounts";
 import { formatMoney, STATUS_LABELS } from "@/lib/format";
 import {
   idOrNull,
@@ -181,7 +181,7 @@ export function EntryDialog({
           >
             <option value="">— výchozí —</option>
             <AccountOptions
-              accounts={paymentAccountsWith(accounts, [
+              accounts={operatingAccountsWith(accounts, [
                 row.overrides.ourAccountId,
               ])}
             />

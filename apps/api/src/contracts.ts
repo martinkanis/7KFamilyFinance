@@ -2,6 +2,8 @@
 
 export type Direction = "expense" | "income";
 export type PaymentStatus = "unpaid" | "processing" | "paid";
+/** Provozní = bankovní účty a hotovost, ze kterých se platí; spořicí = kde peníze leží. */
+export type AccountKind = "operating" | "savings";
 
 export interface Account {
   id: number;
@@ -10,8 +12,7 @@ export interface Account {
   owner: string | null;
   type: string | null;
   number: string | null;
-  /** Platí se z něj nebo na něj chodí platby; ostatní jsou jen místa, kde máme peníze. */
-  paymentAccount: boolean;
+  kind: AccountKind;
   currency: string;
   initialBalance: number;
   note: string | null;

@@ -1,5 +1,7 @@
+import { ACCOUNT_KIND_LABELS, ACCOUNT_TYPES } from "@kkff/api/accountTypes";
 import type {
   Account,
+  AccountKind,
   Counterparty,
   InsurancePolicy,
   Template,
@@ -7,7 +9,8 @@ import type {
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import { type CrudConfig, CrudPage } from "@/components/crud/CrudPage";
-import type { Option } from "@/components/crud/fields";
+import type { FormValues, Option } from "@/components/crud/fields";
+import { CopyButton } from "@/components/ui/copy-button";
 import { api } from "@/lib/api";
 import { formatMoney, safeUrl } from "@/lib/format";
 import { resolveIban } from "@/lib/spd";
@@ -17,17 +20,17 @@ const OWNERS: Option[] = ["Já", "Eva", "Společné", "Děti"].map((owner) => ({
   label: owner,
 }));
 
-const ACCOUNT_TYPES: Option[] = [
-  "Běžný účet",
-  "Spořicí účet",
-  "Termínovaný vklad",
-  "Investice",
-  "Penzijní spoření",
-  "Stavební spoření",
-  "Hotovost",
-].map((type) => ({ value: type, label: type }));
-
 const yes = (value: boolean) => (value ? "✓" : "");
+
+const KIND_OPTIONS: Option[] = (["operating", "savings"] as const).map(
+  (kind) => ({ value: kind, label: ACCOUNT_KIND_LABELS[kind] }),
+);
+
+/** Typy podle druhu účtu: provozní = bankovní / hotovost, spořicí = ETF, spoření… */
+function accountTypeOptions(values: FormValues): Option[] {
+  const kind: AccountKind = values.kind === "savings" ? "savings" : "operating";
+  return ACCOUNT_TYPES[kind].map((type) => ({ value: type, label: type }));
+}
 
 /** Upozorní na překlep v čísle účtu (stejná kontrola jako u QR plateb). */
 function AccountNumber({ value }: { value: string | null }) {
@@ -37,11 +40,12 @@ function AccountNumber({ value }: { value: string | null }) {
   const check = resolveIban(value);
   return (
     <span
-      className="font-mono text-xs"
+      className="font-mono text-xs whitespace-nowrap"
       title={check.ok ? undefined : check.error}
     >
       {value}
       {!check.ok && <span className="ml-1 text-rose-600">⚠</span>}
+      <CopyButton text={value} label="číslo účtu" />
     </span>
   );
 }
@@ -66,12 +70,27 @@ function WebLink({ url }: { url: string | null }) {
 
 const accountsConfig: CrudConfig<"accounts"> = {
   resource: "accounts",
-  title: "Účty a místa, kde máme peníze",
+  title: "Účty a spořicí instrumenty",
   singular: "Účet",
   description:
-    "Platební účty (platí se z nich / chodí na ně platby) se nabízejí u plateb jako „Náš účet“. Ostatní jsou jen místa, kde máme peníze – jejich stav se zapisuje ve Spoření. Počáteční stav je start přehledu majetku.",
+    "Počáteční stav všech účtů je start přehledu majetku; měsíční stav se zapisuje ve Spoření. Text v tabulce jde označit a zkopírovat, číslo účtu ikonou vedle něj.",
+  sections: [
+    {
+      title: "Provozní účty",
+      description:
+        "Bankovní účty a hotovost – platí se z nich a chodí na ně platby, nabízejí se u plateb jako „Náš účet“.",
+      includes: (a) => a.kind === "operating",
+    },
+    {
+      title: "Spořicí účty",
+      description:
+        "ETF a akcie, spořicí účty, stavební a penzijní spoření, kryptoměny – místa, kde peníze leží.",
+      includes: (a) => a.kind === "savings",
+    },
+  ],
+  copySuffixKeys: ["name"],
   searchText: (a: Account) =>
-    `${a.name} ${a.institution ?? ""} ${a.owner ?? ""} ${a.number ?? ""}`,
+    `${a.name} ${a.institution ?? ""} ${a.owner ?? ""} ${a.type ?? ""} ${a.number ?? ""}`,
   columns: [
     {
       label: "Název",
@@ -81,29 +100,35 @@ const accountsConfig: CrudConfig<"accounts"> = {
     { label: "Majitel", render: (a) => a.owner },
     { label: "Typ", render: (a) => a.type },
     { label: "Číslo účtu", render: (a) => <AccountNumber value={a.number} /> },
-    { label: "Platební", render: (a) => yes(a.paymentAccount) },
     {
       label: "Počáteční stav",
       align: "right",
       render: (a) => formatMoney(a.initialBalance),
     },
   ],
-  defaults: { currency: "CZK", initialBalance: "0" },
+  defaults: {
+    kind: "operating",
+    type: "Bankovní účet",
+    currency: "CZK",
+    initialBalance: "0",
+  },
   fields: [
     { key: "name", label: "Název", kind: "text", required: true },
+    {
+      key: "kind",
+      label: "Druh",
+      kind: "select",
+      required: true,
+      options: KIND_OPTIONS,
+    },
+    { key: "type", label: "Typ", kind: "select", options: accountTypeOptions },
     { key: "institution", label: "Instituce", kind: "text" },
     { key: "owner", label: "Majitel", kind: "select", options: OWNERS },
-    { key: "type", label: "Typ", kind: "select", options: ACCOUNT_TYPES },
     {
       key: "number",
       label: "Číslo účtu",
       kind: "text",
       placeholder: "123456789/3030",
-    },
-    {
-      key: "paymentAccount",
-      label: "Platební účet (platí se z něj / chodí na něj platby)",
-      kind: "checkbox",
     },
     { key: "currency", label: "Měna", kind: "text", required: true },
     {
@@ -119,6 +144,7 @@ const accountsConfig: CrudConfig<"accounts"> = {
 
 const counterpartiesConfig: CrudConfig<"counterparties"> = {
   resource: "counterparties",
+  copySuffixKeys: ["name"],
   title: "Protistrany",
   singular: "Protistrana",
   description:
@@ -198,6 +224,7 @@ function templatesConfig(
   const names = new Map(counterparties.map((c) => [c.id, c.name]));
   return {
     resource: "templates",
+    copySuffixKeys: ["code"],
     title: "Šablony plateb",
     singular: "Šablona",
     description:

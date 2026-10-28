@@ -29,13 +29,29 @@ export interface FieldDef<T> {
   required?: boolean;
   /** select s číselnými ID (účty, protistrany…) */
   numericOptions?: boolean;
-  options?: Option[];
+  /** Pevný seznam, nebo seznam závislý na ostatních polích formuláře. */
+  options?: Option[] | ((values: FormValues) => Option[]);
   hint?: string;
   wide?: boolean;
   placeholder?: string;
 }
 
 export type FormValues = Record<string, string | boolean>;
+
+/** Možnosti výběru; hodnota mimo seznam (např. ze staršího importu) zůstane vidět. */
+export function optionsFor<T>(
+  field: FieldDef<T>,
+  values: FormValues,
+  current: string,
+): Option[] {
+  const options =
+    typeof field.options === "function"
+      ? field.options(values)
+      : (field.options ?? []);
+  const isMissing =
+    current !== "" && !options.some((option) => option.value === current);
+  return isMissing ? [{ value: current, label: current }, ...options] : options;
+}
 
 function formValueOf(value: unknown): string | boolean {
   if (typeof value === "boolean") {

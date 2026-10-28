@@ -13,6 +13,8 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const directionEnum = pgEnum("direction", ["expense", "income"]);
+/** Provozní = běžné bankovní účty a hotovost (platí se z nich); spořicí = kde peníze leží. */
+export const accountKindEnum = pgEnum("account_kind", ["operating", "savings"]);
 export const paymentStatusEnum = pgEnum("payment_status", [
   "unpaid",
   "processing",
@@ -40,8 +42,7 @@ export const accounts = pgTable("accounts", {
   owner: text(),
   type: text(),
   number: text(),
-  /** Platí se z něj / chodí na něj platby (ne jen místo, kde máme peníze). */
-  paymentAccount: boolean().notNull().default(false),
+  kind: accountKindEnum().notNull().default("savings"),
   currency: text().notNull().default("CZK"),
   initialBalance: money().notNull().default(0),
   note: text(),
