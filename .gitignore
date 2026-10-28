@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Osobní finanční data nesmí do (veřejného) repozitáře – Excel se do aplikace importuje.
+*.xlsx
+*.xls
+*.csv

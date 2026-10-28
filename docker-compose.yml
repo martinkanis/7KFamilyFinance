@@ -1,0 +1,15 @@
+# Lokální Postgres pro vývoj: `podman compose up -d`
+services:
+  postgres:
+    image: docker.io/library/postgres:17-alpine
+    environment:
+      POSTGRES_DB: kkff
+      POSTGRES_USER: kkff
+      POSTGRES_PASSWORD: kkff-local
+    ports:
+      - "5433:5432"
+    volumes:
+      - kkff-postgres:/var/lib/postgresql/data
+
+volumes:
+  kkff-postgres:

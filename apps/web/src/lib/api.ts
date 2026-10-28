@@ -1,0 +1,111 @@
+import type {
+  Account,
+  ApiErrorBody,
+  Counterparty,
+  CurrentUser,
+  EntryInput,
+  ImportResult,
+  InsurancePolicy,
+  Item,
+  MonthCorrection,
+  MonthView,
+  OneOffInput,
+  Overview,
+  Settings,
+  Template,
+} from "@kkff/api/contracts";
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+type Method = "GET" | "POST" | "PUT" | "DELETE";
+
+async function errorMessage(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as Partial<ApiErrorBody>;
+    return body.error ?? `Požadavek selhal (${response.status})`;
+  } catch {
+    return `Požadavek selhal (${response.status})`;
+  }
+}
+
+async function request<T>(
+  method: Method,
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const isForm = body instanceof FormData;
+  const response = await fetch(path, {
+    method,
+    credentials: "same-origin",
+    headers:
+      body === undefined || isForm
+        ? {}
+        : { "content-type": "application/json" },
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorMessage(response));
+  }
+  return (await response.json()) as T;
+}
+
+/** Číselníky se stejným CRUD rozhraním. */
+export interface Resources {
+  accounts: Account;
+  counterparties: Counterparty;
+  templates: Template;
+  insurance: InsurancePolicy;
+  items: Item;
+}
+
+export type Resource = keyof Resources;
+export type FieldValue = string | number | boolean | null;
+export type Payload = Record<string, FieldValue>;
+
+export const api = {
+  me: () => request<CurrentUser>("GET", "/api/auth/me"),
+  login: (username: string, password: string) =>
+    request<CurrentUser>("POST", "/api/auth/login", { username, password }),
+  logout: () => request<{ ok: boolean }>("POST", "/api/auth/logout"),
+
+  list: <R extends Resource>(resource: R) =>
+    request<Resources[R][]>("GET", `/api/${resource}`),
+  create: <R extends Resource>(resource: R, payload: Payload) =>
+    request<Resources[R]>("POST", `/api/${resource}`, payload),
+  update: <R extends Resource>(resource: R, id: number, payload: Payload) =>
+    request<Resources[R]>("PUT", `/api/${resource}/${id}`, payload),
+  remove: (resource: Resource, id: number) =>
+    request<{ id: number }>("DELETE", `/api/${resource}/${id}`),
+
+  month: (month: string) => request<MonthView>("GET", `/api/months/${month}`),
+  saveItemEntry: (month: string, itemId: number, input: EntryInput) =>
+    request<MonthView>("PUT", `/api/months/${month}/items/${itemId}`, input),
+  createOneOff: (month: string, input: OneOffInput) =>
+    request<MonthView>("POST", `/api/months/${month}/one-offs`, input),
+  updateOneOff: (month: string, id: number, input: OneOffInput) =>
+    request<MonthView>("PUT", `/api/months/${month}/one-offs/${id}`, input),
+  deleteOneOff: (month: string, id: number) =>
+    request<MonthView>("DELETE", `/api/months/${month}/one-offs/${id}`),
+  saveCorrection: (month: string, correction: MonthCorrection) =>
+    request<MonthView>("PUT", `/api/months/${month}/correction`, correction),
+
+  overview: () => request<Overview>("GET", "/api/overview"),
+  settings: () => request<Settings>("GET", "/api/settings"),
+  saveSettings: (settings: Settings) =>
+    request<Settings>("PUT", "/api/settings", settings),
+
+  importExcel: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("confirm", "replace-all");
+    return request<ImportResult>("POST", "/api/excel/import", form);
+  },
+  exportExcelUrl: "/api/excel/export",
+};

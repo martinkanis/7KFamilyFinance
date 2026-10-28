@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --color-brand-50: #eef2fa;
+  --color-brand-100: #d9e1f2;
+  --color-brand-500: #2f5496;
+  --color-brand-600: #24467f;
+  --color-brand-700: #1f3864;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+  dialog::backdrop {
+    background: rgb(15 23 42 / 0.45);
+  }
+}

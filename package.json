@@ -1,0 +1,21 @@
+{
+  "name": "kk-family-finance",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "build": "bun run --filter '@kkff/web' build && bun run --filter '@kkff/api' build",
+    "start": "bun run --filter '@kkff/api' start",
+    "lint": "biome check apps",
+    "format": "biome format --write apps",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun run --filter '*' test",
+    "db:up": "podman compose up -d",
+    "db:generate": "bun run --filter '@kkff/api' db:generate",
+    "auth:hash-password": "bun run --filter '@kkff/api' auth:hash-password"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.3",
+    "typescript": "^7.0.2"
+  }
+}
