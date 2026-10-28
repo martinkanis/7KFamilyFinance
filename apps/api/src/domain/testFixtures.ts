@@ -74,6 +74,7 @@ export function makeAccount(overrides: Partial<Account> = {}): Account {
     owner: "Společné",
     type: "Běžný",
     number: null,
+    paymentAccount: true,
     currency: "CZK",
     initialBalance: 0,
     note: null,

@@ -140,6 +140,16 @@ function uniqueBy<T>(
   });
 }
 
+const CURRENT_ACCOUNT_TYPE_PREFIX = "běžný";
+
+/** Starší sešity sloupec „Platební účet“ nemají – pak se platí z běžných účtů. */
+function isPaymentAccount(cell: ExcelJS.Cell, type: string | null): boolean {
+  if (textOf(cell) != null) {
+    return isYes(cell);
+  }
+  return type?.toLowerCase().startsWith(CURRENT_ACCOUNT_TYPE_PREFIX) ?? false;
+}
+
 function parseAccounts(wb: ExcelJS.Workbook): AccountInput[] {
   const sheet = wb.getWorksheet(SHEETS.accounts);
   const c = ACCOUNT_COLUMNS;
@@ -149,6 +159,10 @@ function parseAccounts(wb: ExcelJS.Workbook): AccountInput[] {
     owner: textOf(cell(c.owner)),
     type: textOf(cell(c.type)),
     number: textOf(cell(c.number)),
+    paymentAccount: isPaymentAccount(
+      cell(c.paymentAccount),
+      textOf(cell(c.type)),
+    ),
     currency: textOf(cell(c.currency))?.toUpperCase() ?? "CZK",
     initialBalance: numberOf(cell(c.initialBalance)) ?? 0,
     note: textOf(cell(c.note)),

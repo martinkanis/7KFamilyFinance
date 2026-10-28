@@ -18,11 +18,11 @@ const OWNERS: Option[] = ["Já", "Eva", "Společné", "Děti"].map((owner) => ({
 }));
 
 const ACCOUNT_TYPES: Option[] = [
-  "Běžný",
-  "Spořicí",
-  "Termínovaný",
+  "Běžný účet",
+  "Spořicí účet",
+  "Termínovaný vklad",
   "Investice",
-  "Penzijní",
+  "Penzijní spoření",
   "Stavební spoření",
   "Hotovost",
 ].map((type) => ({ value: type, label: type }));
@@ -66,10 +66,10 @@ function WebLink({ url }: { url: string | null }) {
 
 const accountsConfig: CrudConfig<"accounts"> = {
   resource: "accounts",
-  title: "Účty a spořicí instrumenty",
+  title: "Účty a místa, kde máme peníze",
   singular: "Účet",
   description:
-    "Počáteční stav všech účtů je startem přehledu majetku – zadává se jednou (datum počátku je v sekci Excel).",
+    "Platební účty (platí se z nich / chodí na ně platby) se nabízejí u plateb jako „Náš účet“. Ostatní jsou jen místa, kde máme peníze – jejich stav se zapisuje ve Spoření. Počáteční stav je start přehledu majetku.",
   searchText: (a: Account) =>
     `${a.name} ${a.institution ?? ""} ${a.owner ?? ""} ${a.number ?? ""}`,
   columns: [
@@ -81,6 +81,7 @@ const accountsConfig: CrudConfig<"accounts"> = {
     { label: "Majitel", render: (a) => a.owner },
     { label: "Typ", render: (a) => a.type },
     { label: "Číslo účtu", render: (a) => <AccountNumber value={a.number} /> },
+    { label: "Platební", render: (a) => yes(a.paymentAccount) },
     {
       label: "Počáteční stav",
       align: "right",
@@ -98,6 +99,11 @@ const accountsConfig: CrudConfig<"accounts"> = {
       label: "Číslo účtu",
       kind: "text",
       placeholder: "123456789/3030",
+    },
+    {
+      key: "paymentAccount",
+      label: "Platební účet (platí se z něj / chodí na něj platby)",
+      kind: "checkbox",
     },
     { key: "currency", label: "Měna", kind: "text", required: true },
     {

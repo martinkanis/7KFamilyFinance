@@ -287,6 +287,7 @@ function writeAccountsSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
     "Měna",
     "Počáteční stav (Kč)",
     "Poznámka",
+    "Platební účet",
   ]);
   writeRows(
     sheet,
@@ -300,6 +301,7 @@ function writeAccountsSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
       a.currency,
       a.initialBalance,
       a.note,
+      yesNo(a.paymentAccount),
     ]),
   );
   for (

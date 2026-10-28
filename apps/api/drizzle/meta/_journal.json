@@ -15,6 +15,13 @@
       "when": 1793212438362,
       "tag": "0001_account_balances",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793212836110,
+      "tag": "0002_payment_accounts",
+      "breakpoints": true
     }
   ]
 }

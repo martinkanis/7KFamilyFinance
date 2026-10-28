@@ -46,6 +46,7 @@ export const ACCOUNT_COLUMNS = {
   currency: 6,
   initialBalance: 7,
   note: 8,
+  paymentAccount: 9,
 } as const;
 
 export const COUNTERPARTY_COLUMNS = {

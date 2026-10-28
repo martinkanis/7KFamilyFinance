@@ -40,6 +40,8 @@ export const accounts = pgTable("accounts", {
   owner: text(),
   type: text(),
   number: text(),
+  /** Platí se z něj / chodí na něj platby (ne jen místo, kde máme peníze). */
+  paymentAccount: boolean().notNull().default(false),
   currency: text().notNull().default("CZK"),
   initialBalance: money().notNull().default(0),
   note: text(),

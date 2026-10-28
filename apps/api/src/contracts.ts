@@ -10,6 +10,8 @@ export interface Account {
   owner: string | null;
   type: string | null;
   number: string | null;
+  /** Platí se z něj nebo na něj chodí platby; ostatní jsou jen místa, kde máme peníze. */
+  paymentAccount: boolean;
   currency: string;
   initialBalance: number;
   note: string | null;

@@ -107,6 +107,7 @@ describe("export → import", () => {
     expect(data.accounts[0]).toMatchObject({
       name: "Air – společný",
       initialBalance: 1000,
+      paymentAccount: true,
     });
     expect(data.templates[0]).toMatchObject({
       code: "E01",

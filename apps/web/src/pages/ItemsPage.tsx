@@ -6,6 +6,7 @@ import type {
 } from "@kkff/api/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { type CrudConfig, CrudPage } from "@/components/crud/CrudPage";
+import { paymentAccountsWith } from "@/lib/accounts";
 import { api } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 
@@ -141,10 +142,10 @@ function itemsConfig(lookups: Lookups): CrudConfig<"items"> {
         label: "Náš účet (z / na)",
         kind: "select",
         numericOptions: true,
-        options: lookups.accounts.map((a) => ({
-          value: String(a.id),
-          label: a.name,
-        })),
+        options: paymentAccountsWith(
+          lookups.accounts,
+          lookups.items.map((item) => item.ourAccountId),
+        ).map((a) => ({ value: String(a.id), label: a.name })),
       },
       {
         key: "counterpartyId",

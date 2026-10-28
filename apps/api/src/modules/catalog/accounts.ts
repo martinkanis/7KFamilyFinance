@@ -20,6 +20,7 @@ const accountBody = t.Object({
   number: nullableText(64),
   currency: t.String({ pattern: "^[A-Z]{3}$" }),
   initialBalance: moneySchema,
+  paymentAccount: t.Boolean(),
   note: nullableText(2000),
   sortOrder: t.Optional(t.Integer()),
 });
