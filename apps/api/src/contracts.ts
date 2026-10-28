@@ -90,6 +90,19 @@ export interface Settings {
   startDate: string | null;
 }
 
+/** Skutečný zůstatek účtu zapsaný v daném měsíci. */
+export interface AccountBalance {
+  accountId: number;
+  month: string;
+  balance: number;
+}
+
+/** null = zůstatek pro měsíc smazat. */
+export interface BalanceInput {
+  accountId: number;
+  balance: number | null;
+}
+
 /** Hodnoty přepsané jen pro jeden měsíc (null = výchozí z položky). */
 export interface MonthOverrides {
   amount: number | null;
@@ -195,6 +208,8 @@ export interface OverviewMonth {
   correction: number;
   wealthStart: number | null;
   wealthEnd: number | null;
+  /** Součet zapsaných zůstatků účtů, null když v měsíci žádný není. */
+  actualWealth: number | null;
   /** Zaplacená část výdajů 0–1, null když měsíc nemá výdaje. */
   paidRatio: number | null;
 }

@@ -13,6 +13,7 @@ import { parseDueMonths } from "../../domain/schedule.ts";
 import { dateOf, formulaOf, isYes, numberOf, textOf } from "./cells.ts";
 import {
   ACCOUNT_COLUMNS,
+  BALANCE_TOTAL_LABEL,
   COUNTERPARTY_COLUMNS,
   DIRECTION_LABELS,
   FIRST_INSURANCE_ROW,
@@ -29,6 +30,7 @@ import {
   SHEETS,
   START_DATE_CELL,
   STATUS_LABELS,
+  TABLE_HEADER_ROW,
   TEMPLATE_COLUMNS,
   templateCodeFromKey,
 } from "./layout.ts";
@@ -63,6 +65,12 @@ export interface ImportedEntry {
   counterpartyName: string | null;
 }
 
+export interface ImportedBalance {
+  accountName: string;
+  month: string;
+  balance: number;
+}
+
 export interface ImportData {
   startDate: string | null;
   accounts: AccountInput[];
@@ -72,6 +80,7 @@ export interface ImportData {
   items: ImportedItem[];
   entries: ImportedEntry[];
   corrections: { month: string; amount: number }[];
+  balances: ImportedBalance[];
   warnings: string[];
 }
 
@@ -362,6 +371,40 @@ function parseCorrections(wb: ExcelJS.Workbook) {
   return corrections;
 }
 
+function balanceMonthOf(cell: ExcelJS.Cell): string | null {
+  const text = textOf(cell);
+  if (text && MONTH_SHEET_PATTERN.test(text)) {
+    return text;
+  }
+  const date = dateOf(cell);
+  return date ? monthKeyOfDate(date) : null;
+}
+
+/** List „Stav účtů“: účty v řádcích, měsíce (YYYY-MM) v hlavičce. Volitelný. */
+function parseBalances(wb: ExcelJS.Workbook): ImportedBalance[] {
+  const sheet = wb.getWorksheet(SHEETS.balances);
+  if (!sheet) {
+    return [];
+  }
+  const header = sheet.getRow(TABLE_HEADER_ROW);
+  const months: { column: number; month: string }[] = [];
+  for (let column = 2; column <= sheet.columnCount; column++) {
+    const month = balanceMonthOf(header.getCell(column));
+    if (month) {
+      months.push({ column, month });
+    }
+  }
+  return rowsWithKey(sheet, FIRST_TABLE_ROW, 1)
+    .filter((cell) => textOf(cell(1)) !== BALANCE_TOTAL_LABEL)
+    .flatMap((cell) =>
+      months.flatMap(({ column, month }) => {
+        const balance = numberOf(cell(column));
+        const accountName = textOf(cell(1)) ?? "";
+        return balance == null ? [] : [{ accountName, month, balance }];
+      }),
+    );
+}
+
 function requireSheets(wb: ExcelJS.Workbook): void {
   const missing = [SHEETS.items, SHEETS.accounts].filter(
     (name) => !wb.getWorksheet(name),
@@ -402,6 +445,7 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<ImportData> {
     ),
     entries: parseMonthSheets(wb),
     corrections: parseCorrections(wb),
+    balances: parseBalances(wb),
     warnings,
   };
 }

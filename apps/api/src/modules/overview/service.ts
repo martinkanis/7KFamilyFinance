@@ -1,10 +1,13 @@
 import type {
+  AccountBalance,
+  MonthRow,
   MonthSummary,
   MonthView,
   Overview,
   OverviewMonth,
   Settings,
 } from "../../contracts.ts";
+import { actualWealthByMonth } from "../../domain/balances.ts";
 import { buildCategoryMatrix } from "../../domain/matrix.ts";
 import { monthKeyOfDate } from "../../domain/month.ts";
 import {
@@ -22,6 +25,7 @@ import {
   type WealthPoint,
 } from "../../domain/wealth.ts";
 import { todayInPrague } from "../../lib/today.ts";
+import { loadBalances } from "../balances/service.ts";
 import { loadSettings } from "../catalog/settings.ts";
 import {
   loadAllCorrections,
@@ -39,25 +43,29 @@ function groupByMonth(
   return groups;
 }
 
-function toOverviewMonth(
-  month: string,
-  summary: MonthSummary,
-  correction: number,
-  wealth: WealthPoint,
-): OverviewMonth {
-  const { income, expense } = summary;
+interface OverviewMonthInput {
+  month: string;
+  summary: MonthSummary;
+  correction: number;
+  wealth: WealthPoint;
+  actualWealth: number | null;
+}
+
+function toOverviewMonth(input: OverviewMonthInput): OverviewMonth {
+  const { income, expense } = input.summary;
   return {
-    month,
+    month: input.month,
     incomePlan: income.plan,
     incomePaid: income.paid,
     expensePlan: expense.plan,
     expensePaid: expense.paid,
     expenseRemaining: expense.remaining,
-    balance: summary.balance,
-    savings: summary.savings,
-    correction,
-    wealthStart: wealth.wealthStart,
-    wealthEnd: wealth.wealthEnd,
+    balance: input.summary.balance,
+    savings: input.summary.savings,
+    correction: input.correction,
+    wealthStart: input.wealth.wealthStart,
+    wealthEnd: input.wealth.wealthEnd,
+    actualWealth: input.actualWealth,
     paidRatio: expense.plan === 0 ? null : expense.paid / expense.plan,
   };
 }
@@ -67,6 +75,7 @@ export interface PlanSnapshot {
   monthViews: MonthView[];
   catalog: PlannerCatalog;
   settings: Settings;
+  balances: AccountBalance[];
 }
 
 export async function getOverview(): Promise<Overview> {
@@ -75,12 +84,15 @@ export async function getOverview(): Promise<Overview> {
 
 /** Celý plán přes rozsah přehledu – pro přehled i export do Excelu. */
 export async function computePlanSnapshot(): Promise<PlanSnapshot> {
-  const [catalog, entries, corrections, settings] = await Promise.all([
-    loadPlannerCatalog(),
-    loadAllEntries(),
-    loadAllCorrections(),
-    loadSettings(),
-  ]);
+  const [catalog, entries, corrections, settings, balances] = await Promise.all(
+    [
+      loadPlannerCatalog(),
+      loadAllEntries(),
+      loadAllCorrections(),
+      loadSettings(),
+      loadBalances(),
+    ],
+  );
   const index = indexCatalog(catalog);
   const correctionOf = new Map(
     corrections.map((row) => [row.month, row.wealthCorrection]),
@@ -88,11 +100,13 @@ export async function computePlanSnapshot(): Promise<PlanSnapshot> {
   const correctionNoteOf = new Map(
     corrections.map((row) => [row.month, row.note]),
   );
+  const actualWealthOf = actualWealthByMonth(balances);
   const months = overviewMonthRange({
     startDate: settings.startDate,
     usedMonths: [
       ...entries.map((entry) => entry.month),
       ...correctionOf.keys(),
+      ...actualWealthOf.keys(),
     ],
     currentMonth: monthKeyOfDate(todayInPrague()),
   });
@@ -117,28 +131,42 @@ export async function computePlanSnapshot(): Promise<PlanSnapshot> {
     startDate: settings.startDate,
     initialWealth,
     months: months.map((month, i) =>
-      toOverviewMonth(
+      toOverviewMonth({
         month,
-        summaries[i] ?? summarizeMonth([]),
-        correctionOf.get(month) ?? 0,
-        wealth[i] ?? { wealthStart: null, wealthEnd: null },
-      ),
+        summary: summaries[i] ?? summarizeMonth([]),
+        correction: correctionOf.get(month) ?? 0,
+        wealth: wealth[i] ?? { wealthStart: null, wealthEnd: null },
+        actualWealth: actualWealthOf.get(month) ?? null,
+      }),
     ),
     expenseMatrix: buildCategoryMatrix("expense", rowsByMonth),
     incomeMatrix: buildCategoryMatrix("income", rowsByMonth),
   };
-  const monthViews = months.map((month, i) => {
-    const rows = rowsByMonth[i] ?? [];
-    return {
+  const monthViews = months.map((month, i) =>
+    toMonthView({
       month,
-      rows,
-      summary: summaries[i] ?? summarizeMonth(rows),
-      accounts: breakdownByAccount(rows, catalog.accounts),
+      rows: rowsByMonth[i] ?? [],
+      catalog,
       correction: {
         amount: correctionOf.get(month) ?? 0,
         note: correctionNoteOf.get(month) ?? null,
       },
-    };
-  });
-  return { overview, monthViews, catalog, settings };
+    }),
+  );
+  return { overview, monthViews, catalog, settings, balances };
+}
+
+function toMonthView(input: {
+  month: string;
+  rows: MonthRow[];
+  catalog: PlannerCatalog;
+  correction: MonthView["correction"];
+}): MonthView {
+  return {
+    month: input.month,
+    rows: input.rows,
+    summary: summarizeMonth(input.rows),
+    accounts: breakdownByAccount(input.rows, input.catalog.accounts),
+    correction: input.correction,
+  };
 }

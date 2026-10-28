@@ -88,6 +88,10 @@ async function exportAndParse() {
     settings: { startDate: "2026-11-01" },
     catalog,
     insurance: [{ id: 1, name: "Auto", annualAmount: 12000, note: null }],
+    balances: [
+      { accountId: 1, month: "2026-10", balance: 15000 },
+      { accountId: 1, month: "2026-11", balance: 8000.5 },
+    ],
     overview,
     monthViews: [monthView()],
   });
@@ -121,6 +125,14 @@ describe("export → import", () => {
       amountFromInsurance: true,
       amount: null,
     });
+  });
+
+  it("zachová měsíční zůstatky účtů bez součtového řádku", async () => {
+    const { balances } = await exportAndParse();
+    expect(balances).toEqual([
+      { accountName: "Air – společný", month: "2026-10", balance: 15000 },
+      { accountName: "Air – společný", month: "2026-11", balance: 8000.5 },
+    ]);
   });
 
   it("zachová stavy, přepsání i jednorázové platby měsíce", async () => {

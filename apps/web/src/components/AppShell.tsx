@@ -9,6 +9,7 @@ import { LoginPage } from "@/pages/LoginPage";
 
 const NAV_LINKS = [
   { to: "/prehled", label: "Přehled" },
+  { to: "/sporeni", label: "Spoření" },
   { to: "/polozky", label: "Položky" },
   { to: "/ucty", label: "Účty" },
   { to: "/protistrany", label: "Protistrany" },

@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import type {
+  AccountBalance,
   CategoryMatrix,
   InsurancePolicy,
   MonthView,
@@ -20,6 +21,7 @@ import {
   writeTitle,
 } from "./exportStyles.ts";
 import {
+  BALANCE_TOTAL_LABEL,
   DIRECTION_LABELS,
   FIRST_INSURANCE_ROW,
   FIRST_TABLE_ROW,
@@ -39,6 +41,7 @@ export interface ExportInput {
   settings: Settings;
   catalog: PlannerCatalog;
   insurance: InsurancePolicy[];
+  balances: AccountBalance[];
   overview: Overview;
   monthViews: MonthView[];
 }
@@ -425,6 +428,46 @@ function writeInsuranceSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
   setColumnWidths(sheet, [34, 15, 50]);
 }
 
+/** Účty × měsíce se skutečnými zůstatky; jde zpět importovat. */
+function writeBalancesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
+  const sheet = wb.addWorksheet(SHEETS.balances, {
+    views: [{ state: "frozen", xSplit: 1, ySplit: TABLE_HEADER_ROW }],
+  });
+  writeTitle(
+    sheet,
+    "Stav účtů a spoření",
+    "Skutečné zůstatky zapsané při měsíční kontrole.",
+  );
+  const months = [...new Set(input.balances.map((b) => b.month))].sort();
+  const balanceOf = new Map(
+    input.balances.map((b) => [`${b.accountId}|${b.month}`, b.balance]),
+  );
+  writeHeaderRow(sheet, TABLE_HEADER_ROW, ["Účet", ...months]);
+  const accounts = input.catalog.accounts;
+  writeRows(
+    sheet,
+    FIRST_TABLE_ROW,
+    accounts.map((account) => [
+      account.name,
+      ...months.map((month) => balanceOf.get(`${account.id}|${month}`) ?? null),
+    ]),
+  );
+  const totalRow = sheet.getRow(FIRST_TABLE_ROW + accounts.length);
+  totalRow.getCell(1).value = BALANCE_TOTAL_LABEL;
+  totalRow.font = { name: FONT, bold: true };
+  months.forEach((month, index) => {
+    totalRow.getCell(index + 2).value = input.balances
+      .filter((b) => b.month === month)
+      .reduce((sum, b) => sum + b.balance, 0);
+  });
+  formatColumns(
+    sheet,
+    months.map((_, index) => index + 2),
+    MONEY_FORMAT,
+  );
+  setColumnWidths(sheet, [34, ...months.map(() => 14)]);
+}
+
 export function buildExportWorkbook(input: ExportInput): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
   wb.creator = "7KFamilyFinance";
@@ -436,6 +479,7 @@ export function buildExportWorkbook(input: ExportInput): ExcelJS.Workbook {
   }
   writeItemsSheet(wb, input, insuranceReserveRow(input.insurance.length));
   writeAccountsSheet(wb, input);
+  writeBalancesSheet(wb, input);
   writeTemplatesSheet(wb, input);
   writeCounterpartiesSheet(wb, input);
   writeInsuranceSheet(wb, input);

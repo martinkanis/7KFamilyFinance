@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { actualWealthByMonth } from "./balances.ts";
 import { addMonths, dueDateIn, monthRange } from "./month.ts";
 import {
   breakdownByAccount,
@@ -220,5 +221,19 @@ describe("majetek", () => {
     expect(months[0]).toBe("2026-10");
     expect(months.at(-1)).toBe("2027-12");
     expect(months).toHaveLength(15);
+  });
+});
+
+describe("skutečný stav účtů", () => {
+  it("sečte zůstatky po měsících", () => {
+    const totals = actualWealthByMonth([
+      { accountId: 1, month: "2026-10", balance: 100.1 },
+      { accountId: 2, month: "2026-10", balance: 200.2 },
+      { accountId: 1, month: "2026-11", balance: 50 },
+    ]);
+    expect([...totals]).toEqual([
+      ["2026-10", 300.3],
+      ["2026-11", 50],
+    ]);
   });
 });

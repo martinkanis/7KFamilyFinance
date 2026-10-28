@@ -1,6 +1,7 @@
 import type { ImportResult } from "../../contracts.ts";
 import { db, type Transaction } from "../../db/index.ts";
 import {
+  accountBalances,
   accounts,
   counterparties,
   insurancePolicies,
@@ -42,6 +43,7 @@ async function insertNamed<T extends { name: string }>(
 }
 
 async function deleteAll(tx: Transaction): Promise<void> {
+  await tx.delete(accountBalances);
   await tx.delete(monthEntries);
   await tx.delete(monthSettings);
   await tx.delete(items);
@@ -188,6 +190,26 @@ async function insertEntries(
   return rows.length;
 }
 
+async function insertBalances(
+  tx: Transaction,
+  data: ImportData,
+  accountIds: IdMap,
+  refs: ReferenceResolver,
+): Promise<number> {
+  const rows = data.balances.flatMap(({ accountName, month, balance }) => {
+    const accountId = refs.resolve(
+      accountIds,
+      accountName,
+      `Stav účtů ${month}, účet`,
+    );
+    return accountId == null ? [] : [{ accountId, month, balance }];
+  });
+  if (rows.length > 0) {
+    await tx.insert(accountBalances).values(rows);
+  }
+  return rows.length;
+}
+
 /** Nahradí všechna data obsahem sešitu; buď celé, nebo vůbec (transakce). */
 export function replaceAllData(data: ImportData): Promise<ImportResult> {
   const warnings = [...data.warnings];
@@ -227,6 +249,7 @@ export function replaceAllData(data: ImportData): Promise<ImportResult> {
       { items: itemIds, accounts: accountIds, counterparties: counterpartyIds },
       refs,
     );
+    const balanceCount = await insertBalances(tx, data, accountIds, refs);
     if (data.corrections.length > 0) {
       await tx.insert(monthSettings).values(
         data.corrections.map((correction) => ({
@@ -244,6 +267,7 @@ export function replaceAllData(data: ImportData): Promise<ImportResult> {
         položky: itemIds.size,
         "záznamy v měsících": entryCount,
         "korekce majetku": data.corrections.length,
+        "zůstatky účtů": balanceCount,
       },
       warnings,
     };

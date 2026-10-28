@@ -9,6 +9,7 @@ export const SHEETS = {
   counterparties: "Protistrany",
   templates: "Šablony",
   insurance: "Pojistky",
+  balances: "Stav účtů",
 } as const;
 
 export const MONTH_SHEET_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -120,6 +121,9 @@ export const MONTH_COLUMNS = {
   direction: 20,
   category: 21,
 } as const;
+
+/** Součtový řádek listu „Stav účtů“ – import ho přeskočí. */
+export const BALANCE_TOTAL_LABEL = "Celkem";
 
 export const OVERVIEW_COLUMNS = { month: 1, correction: 10 } as const;
 

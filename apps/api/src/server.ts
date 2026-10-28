@@ -2,6 +2,7 @@ import { Elysia, ValidationError } from "elysia";
 import { HttpError } from "./lib/errors.ts";
 import { authRoutes } from "./modules/auth/routes.ts";
 import { authenticate } from "./modules/auth/service.ts";
+import { balanceRoutes } from "./modules/balances/routes.ts";
 import { accountRoutes } from "./modules/catalog/accounts.ts";
 import { counterpartyRoutes } from "./modules/catalog/counterparties.ts";
 import { insuranceRoutes } from "./modules/catalog/insurance.ts";
@@ -82,6 +83,7 @@ export const app = new Elysia()
   .use(itemRoutes)
   .use(monthRoutes)
   .use(overviewRoutes)
+  .use(balanceRoutes)
   .use(excelRoutes)
   .all("/api/*", () => {
     throw new HttpError(404, "Neznámá adresa API");

@@ -1,6 +1,8 @@
 import type {
   Account,
+  AccountBalance,
   ApiErrorBody,
+  BalanceInput,
   Counterparty,
   CurrentUser,
   EntryInput,
@@ -97,6 +99,9 @@ export const api = {
     request<MonthView>("PUT", `/api/months/${month}/correction`, correction),
 
   overview: () => request<Overview>("GET", "/api/overview"),
+  balances: () => request<AccountBalance[]>("GET", "/api/balances"),
+  saveBalances: (month: string, inputs: BalanceInput[]) =>
+    request<AccountBalance[]>("PUT", `/api/balances/${month}`, inputs),
   settings: () => request<Settings>("GET", "/api/settings"),
   saveSettings: (settings: Settings) =>
     request<Settings>("PUT", "/api/settings", settings),

@@ -170,3 +170,26 @@ export const monthSettings = pgTable("month_settings", {
   wealthCorrection: money().notNull().default(0),
   note: text(),
 });
+
+/** Skutečný zůstatek účtu zapsaný při měsíční kontrole (blok „Stávající stav“ v Excelu). */
+export const accountBalances = pgTable(
+  "account_balances",
+  {
+    id: serial().primaryKey(),
+    accountId: integer()
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    month: text().notNull(),
+    balance: money().notNull(),
+  },
+  (table) => [
+    uniqueIndex("account_balances_account_month").on(
+      table.accountId,
+      table.month,
+    ),
+    check(
+      "account_balances_month_format",
+      sql`${table.month} ~ '^\\d{4}-\\d{2}$'`,
+    ),
+  ],
+);

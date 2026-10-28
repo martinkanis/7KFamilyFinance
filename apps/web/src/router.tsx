@@ -16,6 +16,7 @@ import { DataPage } from "@/pages/DataPage";
 import { ItemsPage } from "@/pages/ItemsPage";
 import { MonthPage } from "@/pages/MonthPage";
 import { OverviewPage } from "@/pages/OverviewPage";
+import { SavingsPage } from "@/pages/SavingsPage";
 
 const rootRoute = createRootRoute({ component: AppShell });
 const getParentRoute = () => rootRoute;
@@ -38,6 +39,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   monthRoute,
   createRoute({ getParentRoute, path: "/prehled", component: OverviewPage }),
+  createRoute({ getParentRoute, path: "/sporeni", component: SavingsPage }),
   createRoute({ getParentRoute, path: "/polozky", component: ItemsPage }),
   createRoute({ getParentRoute, path: "/ucty", component: AccountsPage }),
   createRoute({

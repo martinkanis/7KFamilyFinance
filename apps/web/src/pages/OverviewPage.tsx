@@ -41,6 +41,7 @@ const MONEY_COLUMNS: {
   { label: "Korekce", value: (m) => m.correction },
   { label: "Majetek začátek", value: (m) => m.wealthStart },
   { label: "Majetek konec", value: (m) => m.wealthEnd, strong: true },
+  { label: "Skutečný stav", value: (m) => m.actualWealth },
 ];
 
 function sumOf(
@@ -55,6 +56,7 @@ function WealthChart({ months }: { months: OverviewMonth[] }) {
     label: shortMonthLabel(m.month),
     bilance: m.balance,
     majetek: m.wealthEnd,
+    skutecnost: m.actualWealth,
   }));
   return (
     <Card className="p-4">
@@ -96,11 +98,21 @@ function WealthChart({ months }: { months: OverviewMonth[] }) {
           <Line
             yAxisId="wealth"
             dataKey="majetek"
-            name="Majetek na konci"
+            name="Majetek na konci (plán)"
             stroke="#1f3864"
             strokeWidth={2.5}
             dot={{ r: 3 }}
             connectNulls={false}
+          />
+          <Line
+            yAxisId="wealth"
+            dataKey="skutecnost"
+            name="Skutečný stav"
+            stroke="#d97706"
+            strokeWidth={2}
+            strokeDasharray="5 4"
+            dot={{ r: 4 }}
+            connectNulls
           />
         </ComposedChart>
       </ResponsiveContainer>
