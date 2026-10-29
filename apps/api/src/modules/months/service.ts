@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gte, isNull } from "drizzle-orm";
 import type {
   EntryInput,
   MonthCorrection,
@@ -6,13 +6,14 @@ import type {
   OneOffInput,
 } from "../../contracts.ts";
 import { db } from "../../db/index.ts";
-import { monthEntries, monthSettings } from "../../db/schema.ts";
+import { items, monthEntries, monthSettings } from "../../db/schema.ts";
 import {
   breakdownByAccount,
   buildMonthRows,
   indexCatalog,
   summarizeMonth,
 } from "../../domain/planner.ts";
+import { endingFrom } from "../../domain/schedule.ts";
 import { notFound, withDbErrors } from "../../lib/errors.ts";
 import { firstOrThrow, normalizeTexts } from "../../lib/normalize.ts";
 import { todayInPrague } from "../../lib/today.ts";
@@ -24,6 +25,7 @@ import {
 
 const ENTRY = "Platba";
 const ONE_OFF = "Jednorázová platba";
+const ITEM = "Položka";
 
 export async function getMonthView(month: string): Promise<MonthView> {
   const [catalog, entries, correction] = await Promise.all([
@@ -125,6 +127,34 @@ export async function deleteOneOff(month: string, id: number): Promise<void> {
     .where(oneOffOf(month, id))
     .returning({ id: monthEntries.id });
   firstOrThrow(rows, () => notFound(ONE_OFF));
+}
+
+/** Pravidelná položka od tohoto měsíce končí; záznamy od měsíce dál se smažou. */
+export async function endItemFrom(
+  month: string,
+  itemId: number,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [item] = await tx
+      .select({ validFrom: items.validFrom, validTo: items.validTo })
+      .from(items)
+      .where(eq(items.id, itemId));
+    if (!item) throw notFound(ITEM);
+    const ending = endingFrom(item, month);
+    if (ending.kind === "delete") {
+      await tx.delete(items).where(eq(items.id, itemId));
+      return;
+    }
+    await tx
+      .update(items)
+      .set({ validTo: ending.validTo })
+      .where(eq(items.id, itemId));
+    await tx
+      .delete(monthEntries)
+      .where(
+        and(eq(monthEntries.itemId, itemId), gte(monthEntries.month, month)),
+      );
+  });
 }
 
 export async function saveCorrection(

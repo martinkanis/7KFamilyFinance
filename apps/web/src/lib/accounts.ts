@@ -1,5 +1,8 @@
 import type { Account } from "@kkff/api/contracts";
 
+export const ACCOUNT_DELETE_WARNING =
+  "Smažou se i jeho zapsané zůstatky ve Spoření; u položek a plateb se účet vymaže.";
+
 /**
  * Účty do výběru „Náš účet“: provozní účty (bankovní a hotovost) a navíc ty,
  * na které už něco odkazuje, aby výběr u starší hodnoty neukazoval prázdno.

@@ -49,11 +49,14 @@ function itemsConfig(lookups: Lookups): CrudConfig<"items"> {
     copySuffixKeys: ["code"],
     title: "Položky",
     singular: "Položka",
+    accusative: "položku",
     description:
       "Pravidelné platby a příjmy – výchozí hodnoty pro všechny měsíce. Hodnoty z šablony se použijí, když je pole v položce prázdné.",
     searchText: (i: Item) =>
       `${i.code} ${i.name} ${i.category} ${i.note ?? ""}`,
     rowClassName: (i) => (i.active ? "" : "text-slate-400"),
+    deleteWarning:
+      "Zmizí ze všech měsíců včetně minulých a smaže se i historie zaplacení. Když platba jen končí, ukonči ji raději košem na stránce měsíce – minulé měsíce zůstanou.",
     defaults: { direction: "expense", active: true },
     columns: [
       {

@@ -11,6 +11,7 @@ import { ExternalLink } from "lucide-react";
 import { type CrudConfig, CrudPage } from "@/components/crud/CrudPage";
 import type { FormValues, Option } from "@/components/crud/fields";
 import { CopyButton } from "@/components/ui/copy-button";
+import { ACCOUNT_DELETE_WARNING } from "@/lib/accounts";
 import { api } from "@/lib/api";
 import { formatMoney, safeUrl } from "@/lib/format";
 import { resolveIban } from "@/lib/spd";
@@ -72,6 +73,8 @@ const accountsConfig: CrudConfig<"accounts"> = {
   resource: "accounts",
   title: "Účty a spořicí instrumenty",
   singular: "Účet",
+  accusative: "účet",
+  deleteWarning: ACCOUNT_DELETE_WARNING,
   description:
     "Počáteční stav všech účtů je start přehledu majetku; měsíční stav se zapisuje ve Spoření. Text v tabulce jde označit a zkopírovat, číslo účtu ikonou vedle něj.",
   sections: [
@@ -150,6 +153,7 @@ const counterpartiesConfig: CrudConfig<"counterparties"> = {
   copySuffixKeys: ["name"],
   title: "Protistrany",
   singular: "Protistrana",
+  accusative: "protistranu",
   description:
     "Firmy, lidé a úřady, kterým platíme nebo od kterých dostáváme peníze.",
   searchText: (c: Counterparty) =>
@@ -190,6 +194,7 @@ const insuranceConfig: CrudConfig<"insurance"> = {
   resource: "insurance",
   title: "Pojistky",
   singular: "Pojistka",
+  accusative: "pojistku",
   description:
     "Součet ročních pojistek / 12 je měsíční rezerva – položky s volbou „z pojistek“ ji platí každý měsíc.",
   searchText: (p: InsurancePolicy) => `${p.name} ${p.note ?? ""}`,
@@ -234,6 +239,7 @@ function templatesConfig(
     copySuffixKeys: ["code"],
     title: "Šablony plateb",
     singular: "Šablona",
+    accusative: "šablonu",
     description:
       "Zrcadlo šablon v bankovnictví. Po kontrole čísla účtu proti bance zaškrtni „Ověřeno“.",
     searchText: (t: Template) =>

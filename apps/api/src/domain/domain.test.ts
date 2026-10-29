@@ -11,7 +11,7 @@ import {
   type PlannerCatalog,
   summarizeMonth,
 } from "./planner.ts";
-import { isItemDueInMonth, parseDueMonths } from "./schedule.ts";
+import { endingFrom, isItemDueInMonth, parseDueMonths } from "./schedule.ts";
 import {
   makeAccount,
   makeCounterparty,
@@ -84,6 +84,33 @@ describe("splatnost položky", () => {
     expect(isItemDueInMonth(makeItem({ active: false }), "2026-11")).toBe(
       false,
     );
+  });
+});
+
+describe("ukončení položky od měsíce", () => {
+  it("platí do konce předchozího měsíce", () => {
+    expect(endingFrom({ validFrom: null, validTo: null }, "2026-10")).toEqual({
+      kind: "end",
+      validTo: "2026-09-30",
+    });
+    expect(
+      endingFrom({ validFrom: "2025-01-01", validTo: null }, "2026-03"),
+    ).toEqual({ kind: "end", validTo: "2026-02-28" });
+  });
+
+  it("dřívější konec platnosti nechá", () => {
+    expect(
+      endingFrom({ validFrom: null, validTo: "2026-05-31" }, "2026-10"),
+    ).toEqual({ kind: "end", validTo: "2026-05-31" });
+  });
+
+  it("položku, která začíná až v tomto měsíci, smaže celou", () => {
+    expect(
+      endingFrom({ validFrom: "2026-10-15", validTo: null }, "2026-10"),
+    ).toEqual({ kind: "delete" });
+    expect(
+      endingFrom({ validFrom: "2026-09-01", validTo: null }, "2026-10"),
+    ).toEqual({ kind: "end", validTo: "2026-09-30" });
   });
 });
 

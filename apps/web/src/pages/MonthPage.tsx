@@ -111,6 +111,24 @@ async function saveRowName(month: string, row: MonthRow, name: string) {
   return api.month(month);
 }
 
+function deleteQuestion(month: string, row: MonthRow): string {
+  return row.isOneOff
+    ? `Smazat jednorázovou platbu „${row.name}“?`
+    : `Ukončit pravidelnou platbu „${row.name}“ od měsíce ${monthLabel(month)}?\n\n` +
+        "V tomto a dalších měsících už nebude, minulé měsíce zůstanou beze změny.";
+}
+
+/** Jednorázová platba se smaže, pravidelná položka od tohoto měsíce skončí. */
+function removeRow(month: string, row: MonthRow) {
+  const { entryId, itemId } = row;
+  if (row.isOneOff && entryId != null) {
+    return api.deleteOneOff(month, entryId);
+  }
+  return itemId != null
+    ? api.endItem(month, itemId)
+    : Promise.reject(new MissingRowIdError(row));
+}
+
 function saveItemEntry(month: string, row: MonthRow, input: EntryInput) {
   const { itemId } = row;
   return itemId != null
@@ -352,16 +370,21 @@ export function MonthPage() {
       onSuccess: closeEditing,
     });
 
-  const onDeleteOneOff = (row: MonthRow) => {
-    const { entryId } = row;
-    if (
-      entryId != null &&
-      window.confirm(`Smazat jednorázovou platbu „${row.name}“?`)
-    ) {
-      save.mutate(() => api.deleteOneOff(month, entryId), {
-        onSuccess: closeEditing,
-      });
-    }
+  const deleteRow = (row: MonthRow) => {
+    if (!window.confirm(deleteQuestion(month, row))) return;
+    setInvalidEdit(null);
+    updateView((current) => ({
+      ...current,
+      rows: current.rows.filter((r) => r.key !== row.key),
+    }));
+    save.mutate(
+      async () => {
+        const view = await removeRow(month, row);
+        if (!row.isOneOff) refreshOtherMonths();
+        return view;
+      },
+      { onSuccess: closeEditing },
+    );
   };
 
   const tableProps = {
@@ -370,6 +393,7 @@ export function MonthPage() {
     onChange: changeRow,
     onRename: renameRow,
     onRenameCategory: renameCategory,
+    onDelete: deleteRow,
     onInvalid: setInvalidEdit,
     onStatus: (row: MonthRow, status: PaymentStatus) =>
       void changeStatus(row, status),
@@ -452,7 +476,7 @@ export function MonthPage() {
           isSaving={save.isPending}
           error={save.error}
           onSave={onSaveOneOff(editing.row)}
-          onDelete={onDeleteOneOff}
+          onDelete={deleteRow}
           onClose={closeEditing}
         />
       )}

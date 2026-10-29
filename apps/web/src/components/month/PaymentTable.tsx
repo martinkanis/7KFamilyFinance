@@ -1,6 +1,7 @@
 import type { MonthRow, PaymentStatus } from "@kkff/api/contracts";
 import { Pencil, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DeleteButton } from "@/components/ui/delete-button";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
 import {
@@ -38,6 +39,7 @@ interface RowActions extends RowEditing {
   onStatus: (row: MonthRow, status: PaymentStatus) => void;
   onEdit: (row: MonthRow) => void;
   onQr: (row: MonthRow) => void;
+  onDelete: (row: MonthRow) => void;
 }
 
 interface PaymentTableProps extends RowActions {
@@ -47,6 +49,22 @@ interface PaymentTableProps extends RowActions {
 
 function hasOverride(row: MonthRow): boolean {
   return Object.values(row.overrides).some((value) => value != null);
+}
+
+function RowDeleteButton({
+  row,
+  onDelete,
+}: Pick<RowActions, "onDelete"> & { row: MonthRow }) {
+  return (
+    <DeleteButton
+      label={
+        row.isOneOff
+          ? `Smazat „${row.name}“`
+          : `Ukončit „${row.name}“ od tohoto měsíce`
+      }
+      onDelete={() => onDelete(row)}
+    />
+  );
 }
 
 function RowButtons({
@@ -86,6 +104,7 @@ function PaymentRow({
   onStatus,
   onEdit,
   onQr,
+  onDelete,
   ...editing
 }: RowActions & { row: MonthRow }) {
   const isZero = row.amount === 0;
@@ -145,6 +164,7 @@ function PaymentRow({
       </td>
       <td className="py-2 pr-4 pl-2 text-right align-top whitespace-nowrap">
         <RowButtons row={row} onEdit={onEdit} onQr={onQr} />
+        <RowDeleteButton row={row} onDelete={onDelete} />
       </td>
     </tr>
   );
@@ -157,6 +177,7 @@ function PaymentCard({
   onStatus,
   onEdit,
   onQr,
+  onDelete,
   ...editing
 }: RowActions & { row: MonthRow }) {
   const isZero = row.amount === 0;
@@ -208,6 +229,10 @@ function PaymentCard({
           {hasOverride(row) && (
             <div className="text-[11px] text-amber-700">upraveno</div>
           )}
+        </div>
+        {/* Koš nahoře, aby dole zůstalo místo pro přepínač stavu. */}
+        <div className="-mt-1 -mr-1 shrink-0">
+          <RowDeleteButton row={row} onDelete={onDelete} />
         </div>
       </div>
       <div className="mt-3 flex items-center gap-1">

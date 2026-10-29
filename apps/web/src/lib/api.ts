@@ -99,6 +99,9 @@ export const api = {
   month: (month: string) => request<MonthView>("GET", `/api/months/${month}`),
   saveItemEntry: (month: string, itemId: number, input: EntryInput) =>
     request<MonthView>("PUT", `/api/months/${month}/items/${itemId}`, input),
+  /** Pravidelná položka od tohoto měsíce končí (minulé měsíce zůstanou). */
+  endItem: (month: string, itemId: number) =>
+    request<MonthView>("DELETE", `/api/months/${month}/items/${itemId}`),
   createOneOff: (month: string, input: OneOffInput) =>
     request<MonthView>("POST", `/api/months/${month}/one-offs`, input),
   updateOneOff: (month: string, id: number, input: OneOffInput) =>

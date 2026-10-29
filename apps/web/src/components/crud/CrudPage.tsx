@@ -3,6 +3,7 @@ import { Copy, Plus, Search } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
+import { DeleteButton } from "@/components/ui/delete-button";
 import { Dialog } from "@/components/ui/dialog";
 import {
   Checkbox,
@@ -39,6 +40,8 @@ export interface CrudConfig<R extends Resource> {
   resource: R;
   title: string;
   singular: string;
+  /** 4. pád pro „Smazat …“ (položku, protistranu). */
+  accusative: string;
   description?: ReactNode;
   columns: ColumnDef<Resources[R]>[];
   fields: FieldDef<Resources[R]>[];
@@ -48,6 +51,32 @@ export interface CrudConfig<R extends Resource> {
   copySuffixKeys?: (keyof Resources[R] & string)[];
   searchText: (row: Resources[R]) => string;
   rowClassName?: (row: Resources[R]) => string;
+  /** Co dalšího smazání způsobí – ukáže se v potvrzení. */
+  deleteWarning?: string;
+}
+
+function confirmDelete<R extends Resource>(
+  config: CrudConfig<R>,
+  row: Resources[R],
+): boolean {
+  const question = `Opravdu smazat ${config.accusative} „${row.name}“?`;
+  return window.confirm(
+    config.deleteWarning ? `${question}\n\n${config.deleteWarning}` : question,
+  );
+}
+
+function useRemove<R extends Resource>(
+  config: CrudConfig<R>,
+  onRemoved?: () => void,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.remove(config.resource, id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries();
+      onRemoved?.();
+    },
+  });
 }
 
 interface Editing<T> {
@@ -171,10 +200,7 @@ function EditDialog<R extends Resource>({
         : api.create(config.resource, payload),
     onSuccess,
   });
-  const remove = useMutation({
-    mutationFn: (id: number) => api.remove(config.resource, id),
-    onSuccess,
-  });
+  const remove = useRemove(config, onClose);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -188,10 +214,7 @@ function EditDialog<R extends Resource>({
   };
 
   const confirmRemove = () => {
-    if (
-      row &&
-      window.confirm(`Opravdu smazat ${config.singular.toLowerCase()}?`)
-    ) {
+    if (row && confirmDelete(config, row)) {
       remove.mutate(row.id);
     }
   };
@@ -268,15 +291,22 @@ function isEmptyCell(content: ReactNode): boolean {
 }
 
 /** Telefon: karta s prvním sloupcem jako nadpisem a ostatními jako popisky. */
+interface RowsProps<R extends Resource> {
+  config: CrudConfig<R>;
+  rows: Resources[R][];
+  onOpen: (row: Resources[R]) => void;
+  onDelete: (row: Resources[R]) => void;
+}
+
+const deleteLabel = (accusative: string, row: { name: string }) =>
+  `Smazat ${accusative} „${row.name}“`;
+
 function CrudCards<R extends Resource>({
   config,
   rows,
   onOpen,
-}: {
-  config: CrudConfig<R>;
-  rows: Resources[R][];
-  onOpen: (row: Resources[R]) => void;
-}) {
+  onDelete,
+}: RowsProps<R>) {
   const [titleColumn, ...detailColumns] = config.columns;
   if (rows.length === 0) {
     return (
@@ -300,7 +330,17 @@ function CrudCards<R extends Resource>({
               config.rowClassName?.(row),
             )}
           >
-            <div className="font-medium">{titleColumn?.render(row)}</div>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 font-medium">
+                {titleColumn?.render(row)}
+              </div>
+              <div className="-mt-1 -mr-1 shrink-0">
+                <DeleteButton
+                  label={deleteLabel(config.accusative, row)}
+                  onDelete={() => onDelete(row)}
+                />
+              </div>
+            </div>
             <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm">
               {detailColumns.map((column) => {
                 const content = column.render(row);
@@ -319,18 +359,11 @@ function CrudCards<R extends Resource>({
   );
 }
 
-function CrudTable<R extends Resource>({
-  config,
-  rows,
-  onOpen,
-}: {
-  config: CrudConfig<R>;
-  rows: Resources[R][];
-  onOpen: (row: Resources[R]) => void;
-}) {
+function CrudTable<R extends Resource>(props: RowsProps<R>) {
+  const { config, rows, onOpen, onDelete } = props;
   return (
     <>
-      <CrudCards config={config} rows={rows} onOpen={onOpen} />
+      <CrudCards {...props} />
       <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
         <table className="w-full text-sm">
           <thead>
@@ -346,6 +379,9 @@ function CrudTable<R extends Resource>({
                   {column.label}
                 </th>
               ))}
+              <th className="w-12 px-3 py-2.5">
+                <span className="sr-only">Smazat</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -369,12 +405,18 @@ function CrudTable<R extends Resource>({
                     {column.render(row)}
                   </td>
                 ))}
+                <td className="px-2 py-1 text-right align-top">
+                  <DeleteButton
+                    label={deleteLabel(config.accusative, row)}
+                    onDelete={() => onDelete(row)}
+                  />
+                </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={config.columns.length}
+                  colSpan={config.columns.length + 1}
                   className="px-3 py-6 text-center text-slate-500"
                 >
                   Nic nenalezeno
@@ -399,6 +441,7 @@ export function CrudPage<R extends Resource>({
   });
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Editing<Resources[R]> | null>(null);
+  const remove = useRemove(config);
 
   const needle = search.trim().toLowerCase();
   const rows = (list.data ?? []).filter((row) =>
@@ -408,6 +451,9 @@ export function CrudPage<R extends Resource>({
     setEditing({ key: Date.now(), row, initial });
   const openRow = (row: Resources[R]) =>
     open(row, formFromRow(config.fields, row));
+  const deleteRow = (row: Resources[R]) => {
+    if (confirmDelete(config, row)) remove.mutate(row.id);
+  };
 
   return (
     <div>
@@ -436,8 +482,18 @@ export function CrudPage<R extends Resource>({
       </div>
       {list.isPending && <Loading />}
       {list.error && <ErrorMessage error={list.error} />}
+      {remove.error && (
+        <div className="mb-3">
+          <ErrorMessage error={remove.error} />
+        </div>
+      )}
       {list.data && !config.sections && (
-        <CrudTable config={config} rows={rows} onOpen={openRow} />
+        <CrudTable
+          config={config}
+          rows={rows}
+          onOpen={openRow}
+          onDelete={deleteRow}
+        />
       )}
       {list.data &&
         config.sections?.map((section) => (
@@ -452,6 +508,7 @@ export function CrudPage<R extends Resource>({
               config={config}
               rows={rows.filter(section.includes)}
               onOpen={openRow}
+              onDelete={deleteRow}
             />
           </section>
         ))}

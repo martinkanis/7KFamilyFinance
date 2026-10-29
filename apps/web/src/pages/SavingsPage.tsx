@@ -11,6 +11,8 @@ import { type KeyboardEvent, useState } from "react";
 import { ExcelBalancesDialog } from "@/components/savings/ExcelBalancesDialog";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
+import { DeleteButton } from "@/components/ui/delete-button";
+import { ACCOUNT_DELETE_WARNING } from "@/lib/accounts";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
@@ -160,19 +162,30 @@ function AccountBalanceRow({
   balanceOf,
   disabled,
   onSave,
+  onDelete,
 }: {
   account: Account;
   months: string[];
   balanceOf: BalanceLookup;
   disabled: boolean;
   onSave: (month: string, balance: number | null) => void;
+  onDelete: () => void;
 }) {
   return (
     <tr className="border-t border-slate-100 hover:bg-brand-50/50">
-      <td className="sticky left-0 bg-white px-3 py-1.5">
-        <div className="font-medium">{account.name}</div>
-        <div className="text-xs text-slate-500">
-          {[account.owner, account.type].filter(Boolean).join(" · ")}
+      <td className="sticky left-0 bg-white py-1.5 pr-1 pl-3">
+        <div className="flex items-start justify-between gap-1">
+          <div className="min-w-0">
+            <div className="font-medium">{account.name}</div>
+            <div className="text-xs text-slate-500">
+              {[account.owner, account.type].filter(Boolean).join(" · ")}
+            </div>
+          </div>
+          <DeleteButton
+            label={`Smazat účet „${account.name}“`}
+            disabled={disabled}
+            onDelete={onDelete}
+          />
         </div>
       </td>
       {months.map((month) => {
@@ -220,6 +233,15 @@ export function SavingsPage() {
       void queryClient.invalidateQueries({ queryKey: ["overview"] });
     },
   });
+
+  const removeAccount = useMutation({
+    mutationFn: (id: number) => api.remove("accounts", id),
+    onSuccess: () => void queryClient.invalidateQueries(),
+  });
+  const deleteAccount = (account: Account) => {
+    const question = `Opravdu smazat účet „${account.name}“?\n\n${ACCOUNT_DELETE_WARNING}`;
+    if (window.confirm(question)) removeAccount.mutate(account.id);
+  };
 
   if (accounts.isPending || balances.isPending) return <Loading />;
   if (accounts.error || balances.error) {
@@ -288,6 +310,7 @@ export function SavingsPage() {
           <FileSpreadsheet className="size-4" /> Načíst z Excelu
         </Button>
         {save.error && <ErrorMessage error={save.error} />}
+        {removeAccount.error && <ErrorMessage error={removeAccount.error} />}
       </div>
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full text-sm md:min-w-[760px]">
@@ -324,7 +347,8 @@ export function SavingsPage() {
                     account={account}
                     months={months}
                     balanceOf={balanceOf}
-                    disabled={save.isPending}
+                    disabled={save.isPending || removeAccount.isPending}
+                    onDelete={() => deleteAccount(account)}
                     onSave={(month, balance) =>
                       save.mutate({
                         month,

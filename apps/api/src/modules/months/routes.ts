@@ -13,6 +13,7 @@ import {
 import {
   createOneOff,
   deleteOneOff,
+  endItemFrom,
   getMonthView,
   saveCorrection,
   saveItemEntry,
@@ -66,6 +67,14 @@ export const monthRoutes = new Elysia({ prefix: "/api/months/:month" })
       return getMonthView(params.month);
     },
     { params: monthItemParams, body: entryBody },
+  )
+  .delete(
+    "/items/:itemId",
+    async ({ params }): Promise<MonthView> => {
+      await endItemFrom(params.month, params.itemId);
+      return getMonthView(params.month);
+    },
+    { params: monthItemParams },
   )
   .post(
     "/one-offs",
