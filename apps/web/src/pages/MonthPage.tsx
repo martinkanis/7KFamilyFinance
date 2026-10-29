@@ -1,4 +1,5 @@
 import type {
+  Direction,
   EntryInput,
   MonthRow,
   MonthView,
@@ -10,6 +11,11 @@ import { Link, Navigate, useParams } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type FormEvent, useRef, useState } from "react";
 import { AccountBreakdown } from "@/components/month/AccountBreakdown";
+import {
+  DIRECTION_PANEL_ID,
+  DirectionTabs,
+  directionTabId,
+} from "@/components/month/DirectionTabs";
 import { EmptyMonth } from "@/components/month/EmptyMonth";
 import { EntryDialog } from "@/components/month/EntryDialog";
 import {
@@ -226,6 +232,7 @@ export function MonthPage() {
     onlyOpen: false,
     account: "",
   });
+  const [direction, setDirection] = useState<Direction>("expense");
   const [editing, setEditing] = useState<Editing>(null);
   const [qrQueue, setQrQueue] = useState<string[] | null>(null);
 
@@ -315,8 +322,24 @@ export function MonthPage() {
         />
       )}
 
-      <PaymentTable title="Výdaje" rows={expenses} {...tableProps} />
-      <PaymentTable title="Příjmy" rows={incomes} {...tableProps} />
+      <div className="space-y-3">
+        <DirectionTabs
+          value={direction}
+          summary={view.data.summary}
+          onChange={setDirection}
+        />
+        <div
+          role="tabpanel"
+          id={DIRECTION_PANEL_ID}
+          aria-labelledby={directionTabId(direction)}
+        >
+          {direction === "expense" ? (
+            <PaymentTable title="Výdaje" rows={expenses} {...tableProps} />
+          ) : (
+            <PaymentTable title="Příjmy" rows={incomes} {...tableProps} />
+          )}
+        </div>
+      </div>
       <AccountBreakdown rows={view.data.accounts} />
       <CorrectionCard
         key={month}

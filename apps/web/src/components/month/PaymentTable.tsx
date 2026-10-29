@@ -259,7 +259,8 @@ function PaymentCards({ title, rows, ...actions }: PaymentTableProps) {
   const groups = groupByCategory(rows);
   return (
     <section className="md:hidden">
-      <h2 className="mb-2 text-lg font-semibold">{title}</h2>
+      {/* Název ukazuje přepínač záložek nad seznamem. */}
+      <h2 className="sr-only">{title}</h2>
       {groups.length === 0 && (
         <p className="rounded-xl bg-white p-4 text-center text-sm text-slate-500">
           Nic k zobrazení
