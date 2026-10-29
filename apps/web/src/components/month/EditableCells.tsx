@@ -25,9 +25,12 @@ type CellProps = Pick<RowEditing, "onChange" | "onInvalid"> & {
   row: MonthRow;
 };
 
-/** Prázdné nepovinné údaje se nabídnou až při najetí na řádek (nebo práci v něm). */
+/**
+ * Prázdné nepovinné údaje se nabídnou až při najetí na řádek (nebo práci v něm).
+ * Místo mají vyhrazené pořád, aby řádky při přejíždění myší neskákaly.
+ */
 const REVEAL_ON_ROW =
-  "hidden group-hover:inline-block group-focus-within:inline-block";
+  "invisible group-hover:visible group-focus-within:visible";
 
 const RENAME_HINT = "mění se ve všech měsících";
 
