@@ -9,11 +9,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Copy, FileSpreadsheet } from "lucide-react";
 import { type KeyboardEvent, useState } from "react";
 import { ExcelBalancesDialog } from "@/components/savings/ExcelBalancesDialog";
+import { WealthSummary } from "@/components/savings/WealthSummary";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { ACCOUNT_DELETE_WARNING } from "@/lib/accounts";
 import { api } from "@/lib/api";
+import {
+  assetGroupsOf,
+  type BalanceLookup,
+  comparableChange,
+  groupTotal,
+  latestRecordedMonth,
+  lookupOf,
+  monthTotal,
+} from "@/lib/balances";
 import { cn } from "@/lib/cn";
 import {
   addMonths,
@@ -28,22 +38,6 @@ import { DESKTOP_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
 const VISIBLE_MONTHS_DESKTOP = 6;
 /** Na telefonu se vejdou dva sloupce: minulý a aktuální měsíc. */
 const VISIBLE_MONTHS_MOBILE = 2;
-
-type BalanceLookup = (accountId: number, month: string) => number | null;
-
-function lookupOf(balances: AccountBalance[]): BalanceLookup {
-  const byKey = new Map(
-    balances.map((b) => [`${b.accountId}|${b.month}`, b.balance]),
-  );
-  return (accountId, month) => byKey.get(`${accountId}|${month}`) ?? null;
-}
-
-function monthTotal(balances: AccountBalance[], month: string): number | null {
-  const inMonth = balances.filter((b) => b.month === month);
-  return inMonth.length === 0
-    ? null
-    : inMonth.reduce((sum, b) => sum + b.balance, 0);
-}
 
 function visibleMonths(lastMonth: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) =>
@@ -112,15 +106,32 @@ function SummaryRow({
   months,
   values,
   strong,
+  color,
 }: {
   label: string;
   months: string[];
   values: (number | null)[];
   strong?: boolean;
+  /** Barva skupiny majetku – stejná jako v přehledu nahoře. */
+  color?: string;
 }) {
   return (
     <tr className={cn("border-t border-slate-200", strong && "font-semibold")}>
-      <td className="sticky left-0 bg-slate-50 px-3 py-2">{label}</td>
+      <td
+        className={cn(
+          "sticky left-0 bg-slate-50 py-2 pr-3",
+          color ? "pl-6" : "pl-3",
+        )}
+      >
+        {color && (
+          <span
+            aria-hidden
+            className="mr-1.5 inline-block size-2.5 rounded-sm"
+            style={{ backgroundColor: color }}
+          />
+        )}
+        {label}
+      </td>
       {months
         .map((month, index) => ({ month, value: values[index] ?? null }))
         .map(({ month, value }) => (
@@ -144,17 +155,6 @@ const KIND_TITLES: Record<AccountKind, string> = {
   operating: "Provozní účty",
   savings: "Spořicí účty",
 };
-
-function groupTotal(
-  group: Account[],
-  month: string,
-  balanceOf: BalanceLookup,
-): number | null {
-  const values = group
-    .map((account) => balanceOf(account.id, month))
-    .filter((value): value is number => value != null);
-  return values.length === 0 ? null : values.reduce((sum, v) => sum + v, 0);
-}
 
 function AccountBalanceRow({
   account,
@@ -254,14 +254,17 @@ export function SavingsPage() {
   );
   const balanceOf = lookupOf(balances.data);
   const totals = months.map((month) => monthTotal(balances.data, month));
-  const previousTotals = months.map((month) =>
-    monthTotal(balances.data, addMonths(month, -1)),
+  // Jen účty zapsané v obou měsících – chybějící zápis není pokles.
+  const changes = months.map((month) =>
+    comparableChange(accounts.data, month, addMonths(month, -1), balanceOf),
   );
   const planOf = new Map<string, OverviewMonth>(
     (overview.data?.months ?? []).map((m) => [m.month, m]),
   );
   const plans = months.map((month) => planOf.get(month)?.wealthEnd ?? null);
   const toCopy = copyFromPrevious(accounts.data, lastMonth, balanceOf);
+  const assetGroups = assetGroupsOf(accounts.data);
+  const summaryMonth = latestRecordedMonth(balances.data, lastMonth);
   const onExcelApplied = (month: string, saved: AccountBalance[]) => {
     queryClient.setQueryData(["balances"], saved);
     void queryClient.invalidateQueries({ queryKey: ["accounts"] });
@@ -297,6 +300,14 @@ export function SavingsPage() {
           </div>
         }
       />
+      <WealthSummary
+        month={summaryMonth}
+        groups={assetGroups}
+        balanceOf={balanceOf}
+        plan={
+          summaryMonth ? (planOf.get(summaryMonth)?.wealthEnd ?? null) : null
+        }
+      />
       <div className="flex flex-wrap items-center gap-3">
         <Button
           className="w-full sm:w-auto"
@@ -329,6 +340,50 @@ export function SavingsPage() {
               ))}
             </tr>
           </thead>
+          <tbody>
+            <tr className="bg-brand-50">
+              <td
+                colSpan={months.length + 1}
+                className="sticky left-0 px-3 py-1.5 text-sm font-semibold text-brand-700"
+              >
+                Souhrn
+              </td>
+            </tr>
+            <SummaryRow
+              label="Celkem (skutečnost)"
+              months={months}
+              values={totals}
+              strong
+            />
+            {assetGroups.map((group) => (
+              <SummaryRow
+                key={group.key}
+                label={group.label}
+                color={group.color}
+                months={months}
+                values={months.map((month) =>
+                  groupTotal(group.accounts, month, balanceOf),
+                )}
+              />
+            ))}
+            <SummaryRow
+              label="Změna proti minulému měsíci"
+              months={months}
+              values={changes}
+            />
+            <SummaryRow
+              label="Plán podle cashflow"
+              months={months}
+              values={plans}
+            />
+            <SummaryRow
+              label="Skutečnost − plán"
+              months={months}
+              values={totals.map((total, i) =>
+                difference(total, plans[i] ?? null),
+              )}
+            />
+          </tbody>
           {ACCOUNT_KINDS.map((kind) => {
             const group = accounts.data.filter((a) => a.kind === kind);
             return (
@@ -367,33 +422,6 @@ export function SavingsPage() {
               </tbody>
             );
           })}
-          <tfoot>
-            <SummaryRow
-              label="Celkem (skutečnost)"
-              months={months}
-              values={totals}
-              strong
-            />
-            <SummaryRow
-              label="Změna proti minulému měsíci"
-              months={months}
-              values={totals.map((total, i) =>
-                difference(total, previousTotals[i] ?? null),
-              )}
-            />
-            <SummaryRow
-              label="Plán podle cashflow"
-              months={months}
-              values={plans}
-            />
-            <SummaryRow
-              label="Skutečnost − plán"
-              months={months}
-              values={totals.map((total, i) =>
-                difference(total, plans[i] ?? null),
-              )}
-            />
-          </tfoot>
         </table>
       </div>
       {isImporting && (

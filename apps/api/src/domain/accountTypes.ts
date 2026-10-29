@@ -35,3 +35,37 @@ export function defaultKindForType(type: string | null): AccountKind {
     ? "operating"
     : "savings";
 }
+
+/** Skupiny majetku pro přehled na stránce Spoření. */
+export type AssetGroup =
+  | "bank"
+  | "savings"
+  | "building"
+  | "investments"
+  | "other";
+
+export const ASSET_GROUPS: readonly { key: AssetGroup; label: string }[] = [
+  { key: "bank", label: "Bankovní účty" },
+  { key: "savings", label: "Spoření" },
+  { key: "building", label: "Stavební spoření" },
+  { key: "investments", label: "Akcie a kryptoměny" },
+  { key: "other", label: "Ostatní" },
+];
+
+const GROUP_BY_TYPE: Record<string, AssetGroup> = {
+  "Bankovní účet": "bank",
+  "Bankovní spořicí účet": "savings",
+  "Penzijní spoření": "savings",
+  "Stavební spoření": "building",
+  "ETF & akcie": "investments",
+  Akcie: "investments",
+  Kryptoměny: "investments",
+};
+
+/** Hotovost, účty bez typu a vlastní typy patří do „Ostatní“. */
+export function assetGroupOf(type: string | null): AssetGroup {
+  const normalized = normalizeAccountType(type);
+  return (
+    (normalized == null ? undefined : GROUP_BY_TYPE[normalized]) ?? "other"
+  );
+}

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { suggestAccount } from "./accountMatch.ts";
-import { defaultKindForType, normalizeAccountType } from "./accountTypes.ts";
+import {
+  assetGroupOf,
+  defaultKindForType,
+  normalizeAccountType,
+} from "./accountTypes.ts";
 import { actualWealthByMonth } from "./balances.ts";
 import { addMonths, dueDateIn, monthRange, nearestMonthKey } from "./month.ts";
 import {
@@ -256,6 +260,21 @@ describe("majetek", () => {
     expect(months[0]).toBe("2026-10");
     expect(months.at(-1)).toBe("2027-12");
     expect(months).toHaveLength(15);
+  });
+});
+
+describe("skupiny majetku", () => {
+  it("rozdělí typy účtů do přehledu", () => {
+    expect(assetGroupOf("Bankovní účet")).toBe("bank");
+    expect(assetGroupOf("Běžný účet")).toBe("bank");
+    expect(assetGroupOf("Spořicí účet")).toBe("savings");
+    expect(assetGroupOf("Penzijní spoření")).toBe("savings");
+    expect(assetGroupOf("Stavební spoření")).toBe("building");
+    expect(assetGroupOf("Kryptoměny")).toBe("investments");
+    expect(assetGroupOf("ETF & akcie")).toBe("investments");
+    expect(assetGroupOf("Hotovost")).toBe("other");
+    expect(assetGroupOf(null)).toBe("other");
+    expect(assetGroupOf("Zlato")).toBe("other");
   });
 });
 
