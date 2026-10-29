@@ -1,8 +1,8 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { Elysia, type Static, t } from "elysia";
-import type { Item } from "../../contracts.ts";
+import type { CategoryRenameResult, Item } from "../../contracts.ts";
 import { db } from "../../db/index.ts";
-import { items } from "../../db/schema.ts";
+import { items, monthEntries } from "../../db/schema.ts";
 import {
   InvalidDueMonthsError,
   parseDueMonths,
@@ -19,9 +19,11 @@ import {
   requiredText,
 } from "../../lib/schemas.ts";
 
+const directionSchema = t.Union([t.Literal("expense"), t.Literal("income")]);
+
 const itemBody = t.Object({
   code: requiredText(20),
-  direction: t.Union([t.Literal("expense"), t.Literal("income")]),
+  direction: directionSchema,
   category: requiredText(),
   name: requiredText(),
   amount: nullableMoney,
@@ -46,6 +48,17 @@ const itemBody = t.Object({
 
 type ItemBody = Static<typeof itemBody>;
 
+const itemRenameBody = t.Object({
+  name: t.Optional(requiredText()),
+  category: t.Optional(requiredText()),
+});
+
+const categoryRenameBody = t.Object({
+  direction: directionSchema,
+  from: requiredText(),
+  to: requiredText(),
+});
+
 const ENTITY = "Položka";
 
 function validateItem(input: ItemBody): ItemBody {
@@ -62,6 +75,34 @@ function validateItem(input: ItemBody): ItemBody {
     throw invalidInput("„Platí od“ musí být před „Platí do“");
   }
   return item.amountFromInsurance ? { ...item, amount: null } : item;
+}
+
+/** Kategorie je jen text u položek a jednorázových plateb – přejmenuje se všude naráz. */
+function renameCategory({
+  direction,
+  from,
+  to,
+}: Static<typeof categoryRenameBody>): Promise<CategoryRenameResult> {
+  const [source, target] = [from.trim(), to.trim()];
+  return db.transaction(async (tx) => {
+    const renamedItems = await tx
+      .update(items)
+      .set({ category: target })
+      .where(and(eq(items.direction, direction), eq(items.category, source)))
+      .returning({ id: items.id });
+    const renamedOneOffs = await tx
+      .update(monthEntries)
+      .set({ category: target })
+      .where(
+        and(
+          isNull(monthEntries.itemId),
+          eq(monthEntries.direction, direction),
+          eq(monthEntries.category, source),
+        ),
+      )
+      .returning({ id: monthEntries.id });
+    return { items: renamedItems.length, oneOffs: renamedOneOffs.length };
+  });
 }
 
 async function nextSortOrder(): Promise<number> {
@@ -102,6 +143,25 @@ export const itemRoutes = new Elysia({ prefix: "/api/items" })
       return firstOrThrow(rows, () => notFound(ENTITY));
     },
     { params: idParams, body: itemBody },
+  )
+  .patch(
+    "/:id",
+    async ({ params, body }): Promise<Item> => {
+      const rename = normalizeTexts(body);
+      if (rename.name == null && rename.category == null) {
+        throw invalidInput("Vyplň nový název nebo kategorii");
+      }
+      const rows = await withDbErrors(ENTITY, () =>
+        db.update(items).set(rename).where(eq(items.id, params.id)).returning(),
+      );
+      return firstOrThrow(rows, () => notFound(ENTITY));
+    },
+    { params: idParams, body: itemRenameBody },
+  )
+  .post(
+    "/rename-category",
+    ({ body }): Promise<CategoryRenameResult> => renameCategory(body),
+    { body: categoryRenameBody },
   )
   .delete(
     "/:id",

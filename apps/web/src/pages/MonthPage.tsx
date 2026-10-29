@@ -41,10 +41,15 @@ import {
 } from "@/lib/format";
 import { parseOptionalNumber, textOrNull, toText } from "@/lib/formValues";
 import {
+  entryInputOf,
   isPayable,
   itemEntryWithStatus,
+  oneOffInputOf,
   oneOffWithStatus,
+  rowWithChanges,
+  withCategoryRenamed,
   withOptimisticStatus,
+  withRow,
 } from "@/lib/monthRows";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -80,6 +85,30 @@ function saveStatus(month: string, row: MonthRow, status: PaymentStatus) {
     return api.saveItemEntry(month, itemId, itemEntryWithStatus(row, status));
   }
   return Promise.reject(new MissingRowIdError(row));
+}
+
+/** Úprava měsíčních hodnot řádku přímo v tabulce. */
+function saveRowChanges(
+  month: string,
+  row: MonthRow,
+  changes: Partial<EntryInput>,
+) {
+  const { entryId } = row;
+  if (row.isOneOff && entryId != null) {
+    return api.updateOneOff(month, entryId, oneOffInputOf(row, changes));
+  }
+  return saveItemEntry(month, row, entryInputOf(row, changes));
+}
+
+/** Název pravidelné položky patří položce, takže se změní ve všech měsících. */
+async function saveRowName(month: string, row: MonthRow, name: string) {
+  const { entryId, itemId } = row;
+  if (row.isOneOff && entryId != null) {
+    return api.updateOneOff(month, entryId, oneOffInputOf(row, { name }));
+  }
+  if (itemId == null) throw new MissingRowIdError(row);
+  await api.renameItem(itemId, { name });
+  return api.month(month);
 }
 
 function saveItemEntry(month: string, row: MonthRow, input: EntryInput) {
@@ -235,6 +264,7 @@ export function MonthPage() {
   const [direction, setDirection] = useState<Direction>("expense");
   const [editing, setEditing] = useState<Editing>(null);
   const [qrQueue, setQrQueue] = useState<string[] | null>(null);
+  const [invalidEdit, setInvalidEdit] = useState<string | null>(null);
 
   if (!isValidMonth) {
     return <Navigate to="/mesic/$month" params={{ month: currentMonth() }} />;
@@ -256,13 +286,60 @@ export function MonthPage() {
     setEditing(null);
   };
 
-  const changeStatus = (row: MonthRow, status: PaymentStatus) => {
+  const updateView = (update: (current: MonthView) => MonthView) =>
     queryClient.setQueryData<MonthView>(
       ["month", month],
-      (current) =>
-        current && withOptimisticStatus(current, row.key, status, todayIso()),
+      (current) => current && update(current),
+    );
+
+  const changeStatus = (row: MonthRow, status: PaymentStatus) => {
+    updateView((current) =>
+      withOptimisticStatus(current, row.key, status, todayIso()),
     );
     return save.mutateAsync(() => saveStatus(month, row, status));
+  };
+
+  // Název a kategorie se mění ve všech měsících – ostatní se načtou znovu.
+  const refreshOtherMonths = () => {
+    void queryClient.invalidateQueries({
+      queryKey: ["month"],
+      predicate: (query) => query.queryKey[1] !== month,
+    });
+    void queryClient.invalidateQueries({ queryKey: ["items"] });
+  };
+
+  const changeRow = (row: MonthRow, changes: Partial<EntryInput>) => {
+    setInvalidEdit(null);
+    const ourAccount =
+      changes.ourAccountId == null
+        ? undefined
+        : (accounts.data ?? []).find((a) => a.id === changes.ourAccountId);
+    updateView((current) =>
+      withRow(current, row.key, (r) =>
+        rowWithChanges(r, month, changes, ourAccount),
+      ),
+    );
+    save.mutate(() => saveRowChanges(month, row, changes));
+  };
+
+  const renameRow = (row: MonthRow, name: string) => {
+    setInvalidEdit(null);
+    updateView((current) => withRow(current, row.key, (r) => ({ ...r, name })));
+    save.mutate(async () => {
+      const view = await saveRowName(month, row, name);
+      if (!row.isOneOff) refreshOtherMonths();
+      return view;
+    });
+  };
+
+  const renameCategory = (from: string, to: string) => {
+    setInvalidEdit(null);
+    updateView((current) => withCategoryRenamed(current, direction, from, to));
+    save.mutate(async () => {
+      await api.renameCategory({ direction, from, to });
+      refreshOtherMonths();
+      return api.month(month);
+    });
   };
 
   const onSaveEntry = (row: MonthRow) => (input: EntryInput) =>
@@ -289,6 +366,11 @@ export function MonthPage() {
 
   const tableProps = {
     today: todayIso(),
+    accounts: accounts.data ?? [],
+    onChange: changeRow,
+    onRename: renameRow,
+    onRenameCategory: renameCategory,
+    onInvalid: setInvalidEdit,
     onStatus: (row: MonthRow, status: PaymentStatus) =>
       void changeStatus(row, status),
     onEdit: (row: MonthRow) =>
@@ -307,7 +389,6 @@ export function MonthPage() {
         actions={<MonthNavigation month={month} />}
       />
       <SummaryCards summary={view.data.summary} />
-      {save.error && !editing && <ErrorMessage error={save.error} />}
 
       {view.data.rows.length === 0 ? (
         <EmptyMonth />
@@ -328,6 +409,8 @@ export function MonthPage() {
           summary={view.data.summary}
           onChange={setDirection}
         />
+        {invalidEdit && <ErrorMessage error={new Error(invalidEdit)} />}
+        {save.error && !editing && <ErrorMessage error={save.error} />}
         <div
           role="tabpanel"
           id={DIRECTION_PANEL_ID}

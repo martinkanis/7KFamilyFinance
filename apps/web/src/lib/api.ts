@@ -3,6 +3,8 @@ import type {
   AccountBalance,
   ApiErrorBody,
   BalanceInput,
+  CategoryRename,
+  CategoryRenameResult,
   Counterparty,
   CurrentUser,
   EntryInput,
@@ -11,6 +13,7 @@ import type {
   ImportResult,
   InsurancePolicy,
   Item,
+  ItemRename,
   MonthCorrection,
   MonthView,
   OneOffInput,
@@ -28,7 +31,7 @@ export class ApiError extends Error {
   }
 }
 
-type Method = "GET" | "POST" | "PUT" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 async function errorMessage(response: Response): Promise<string> {
   try {
@@ -87,6 +90,11 @@ export const api = {
     request<Resources[R]>("PUT", `/api/${resource}/${id}`, payload),
   remove: (resource: Resource, id: number) =>
     request<{ id: number }>("DELETE", `/api/${resource}/${id}`),
+
+  renameItem: (id: number, rename: ItemRename) =>
+    request<Item>("PATCH", `/api/items/${id}`, rename),
+  renameCategory: (rename: CategoryRename) =>
+    request<CategoryRenameResult>("POST", "/api/items/rename-category", rename),
 
   month: (month: string) => request<MonthView>("GET", `/api/months/${month}`),
   saveItemEntry: (month: string, itemId: number, input: EntryInput) =>

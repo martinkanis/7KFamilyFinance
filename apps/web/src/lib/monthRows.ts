@@ -1,7 +1,10 @@
 import type {
+  Direction,
   EntryInput,
+  MonthOverrides,
   MonthRow,
   MonthView,
+  NamedRef,
   OneOffInput,
   PaymentStatus,
 } from "@kkff/api/contracts";
@@ -113,11 +116,83 @@ export function withOptimisticStatus(
   status: PaymentStatus,
   today: string,
 ): MonthView {
+  return withRow(view, rowKey, (row) => ({
+    ...row,
+    status,
+    paidOn: status === "paid" ? today : null,
+  }));
+}
+
+/** Datum splatnosti v měsíci; den za koncem měsíce se posune na poslední den (jako na serveru). */
+export function dueDateIn(month: string, day: number): string {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const lastDay = new Date(year ?? 0, monthNumber ?? 0, 0).getDate();
+  return `${month}-${String(Math.min(day, lastDay)).padStart(2, "0")}`;
+}
+
+const OVERRIDE_KEYS: (keyof MonthOverrides)[] = [
+  "amount",
+  "dueDay",
+  "ourAccountId",
+  "counterpartyAccount",
+  "vs",
+];
+
+/**
+ * Řádek po úpravě přímo v tabulce, než odpoví server. Návrat k výchozí
+ * hodnotě (null) nechá zobrazenou hodnotu – výchozí hodnoty položky zná jen server.
+ */
+export function rowWithChanges(
+  row: MonthRow,
+  month: string,
+  changes: Partial<EntryInput>,
+  ourAccount?: NamedRef | null,
+): MonthRow {
+  const overrides = { ...row.overrides };
+  for (const key of OVERRIDE_KEYS) {
+    if (changes[key] !== undefined) {
+      Object.assign(overrides, { [key]: changes[key] });
+    }
+  }
+  const { amount, dueDay, counterpartyAccount, vs } = changes;
+  return {
+    ...row,
+    overrides,
+    amount: amount ?? row.amount,
+    dueDate: dueDay == null ? row.dueDate : dueDateIn(month, dueDay),
+    counterpartyAccount: counterpartyAccount ?? row.counterpartyAccount,
+    vs: vs ?? row.vs,
+    ourAccount:
+      changes.ourAccountId != null && ourAccount !== undefined
+        ? ourAccount
+        : row.ourAccount,
+    note: changes.note === undefined ? row.note : changes.note,
+    paidOn: changes.paidOn === undefined ? row.paidOn : changes.paidOn,
+  };
+}
+
+export function withRow(
+  view: MonthView,
+  rowKey: string,
+  update: (row: MonthRow) => MonthRow,
+): MonthView {
+  return {
+    ...view,
+    rows: view.rows.map((row) => (row.key === rowKey ? update(row) : row)),
+  };
+}
+
+export function withCategoryRenamed(
+  view: MonthView,
+  direction: Direction,
+  from: string,
+  to: string,
+): MonthView {
   return {
     ...view,
     rows: view.rows.map((row) =>
-      row.key === rowKey
-        ? { ...row, status, paidOn: status === "paid" ? today : null }
+      row.direction === direction && row.category === from
+        ? { ...row, category: to }
         : row,
     ),
   };

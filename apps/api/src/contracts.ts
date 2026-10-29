@@ -88,6 +88,20 @@ export type CounterpartyInput = Omit<Counterparty, "id">;
 export type TemplateInput = Omit<Template, "id">;
 export type InsurancePolicyInput = Omit<InsurancePolicy, "id">;
 export type ItemInput = Omit<Item, "id">;
+/** Přejmenování položky přímo ze stránky měsíce – platí pro všechny měsíce. */
+export type ItemRename = Partial<Pick<Item, "name" | "category">>;
+
+/** Přejmenuje kategorii u položek i jednorázových plateb ve všech měsících. */
+export interface CategoryRename {
+  direction: Direction;
+  from: string;
+  to: string;
+}
+
+export interface CategoryRenameResult {
+  items: number;
+  oneOffs: number;
+}
 
 export interface Settings {
   startDate: string | null;
