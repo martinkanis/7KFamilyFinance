@@ -18,6 +18,7 @@ import {
 } from "@/components/month/DirectionTabs";
 import { EmptyMonth } from "@/components/month/EmptyMonth";
 import { EntryDialog } from "@/components/month/EntryDialog";
+import { MonthOverview } from "@/components/month/MonthOverview";
 import {
   type Filters,
   MonthToolbar,
@@ -26,7 +27,6 @@ import {
 import { OneOffDialog } from "@/components/month/OneOffDialog";
 import { PaymentTable } from "@/components/month/PaymentTable";
 import { QrPayDialog } from "@/components/month/QrPayDialog";
-import { SummaryCards } from "@/components/month/SummaryCards";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
@@ -264,6 +264,13 @@ export function MonthPage() {
     queryFn: () => api.month(month),
     enabled: isValidMonth,
   });
+  // Minulý měsíc jen pro porovnání v přehledu nahoře.
+  const previousMonth = addMonths(month, -1);
+  const previousView = useQuery({
+    queryKey: ["month", previousMonth],
+    queryFn: () => api.month(previousMonth),
+    enabled: isValidMonth,
+  });
   const accounts = useQuery({
     queryKey: ["accounts"],
     queryFn: () => api.list("accounts"),
@@ -412,7 +419,11 @@ export function MonthPage() {
         description={`Zbývá zaplatit ${formatMoney(view.data.summary.expense.remaining)} · ještě má přijít ${formatMoney(view.data.summary.income.remaining)}`}
         actions={<MonthNavigation month={month} />}
       />
-      <SummaryCards summary={view.data.summary} />
+      <MonthOverview
+        view={view.data}
+        previous={previousView.data}
+        direction={direction}
+      />
 
       {view.data.rows.length === 0 ? (
         <EmptyMonth />

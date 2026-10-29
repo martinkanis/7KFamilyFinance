@@ -1,4 +1,11 @@
 import type { Account } from "@kkff/api/contracts";
+import {
+  BreakdownTile,
+  Change,
+  percentLabel,
+  ShareBar,
+  sharesOf,
+} from "@/components/ui/breakdown";
 import { Card } from "@/components/ui/card";
 import {
   type AssetGroupRow,
@@ -9,105 +16,9 @@ import {
 import { cn } from "@/lib/cn";
 import { addMonths, formatMoney, monthLabel } from "@/lib/format";
 
-const PERCENT = new Intl.NumberFormat("cs-CZ", { maximumFractionDigits: 0 });
-
-function percentLabel(share: number): string {
-  return share > 0 && share < 0.01
-    ? "< 1 %"
-    : `${PERCENT.format(share * 100)} %`;
-}
-
-function Change({
-  value,
-  className,
-}: {
-  value: number | null;
-  className?: string;
-}) {
-  if (value == null) return null;
-  return (
-    <div className={cn("text-xs text-slate-500", className)}>
-      <span
-        className={cn(
-          "font-semibold tabular-nums",
-          value > 0 && "text-emerald-700",
-          value < 0 && "text-rose-700",
-        )}
-      >
-        {value > 0 ? "+" : ""}
-        {formatMoney(value)}
-      </span>{" "}
-      proti minulému měsíci
-    </div>
-  );
-}
-
 interface GroupValue extends AssetGroupRow {
   value: number | null;
   change: number | null;
-}
-
-/** Podíly skupin jedním pruhem; záporné zůstatky (přečerpání) se do podílu nepočítají. */
-function ShareBar({ groups }: { groups: GroupValue[] }) {
-  const positive = groups.filter((g) => (g.value ?? 0) > 0);
-  const sum = positive.reduce((total, g) => total + (g.value ?? 0), 0);
-  if (sum <= 0) return null;
-  return (
-    <div
-      className="mt-4 flex h-3 gap-0.5 overflow-hidden rounded-full"
-      role="img"
-      aria-label={positive
-        .map((g) => `${g.label} ${percentLabel((g.value ?? 0) / sum)}`)
-        .join(", ")}
-    >
-      {positive.map((g) => (
-        <div
-          key={g.key}
-          title={`${g.label}: ${formatMoney(g.value)} (${percentLabel((g.value ?? 0) / sum)})`}
-          className="h-full first:rounded-l-full last:rounded-r-full"
-          style={{
-            width: `${((g.value ?? 0) / sum) * 100}%`,
-            backgroundColor: g.color,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function GroupTile({
-  group,
-  share,
-}: {
-  group: GroupValue;
-  share: number | null;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-200 p-3">
-      <div className="flex items-center gap-1.5 text-sm text-slate-600">
-        <span
-          aria-hidden
-          className="size-2.5 shrink-0 rounded-sm"
-          style={{ backgroundColor: group.color }}
-        />
-        <span className="truncate">{group.label}</span>
-      </div>
-      <div
-        className={cn(
-          "mt-1 text-lg font-semibold tabular-nums",
-          group.value != null && group.value < 0 && "text-rose-700",
-        )}
-      >
-        {formatMoney(group.value)}
-      </div>
-      {share != null && (
-        <div className="text-xs text-slate-500">
-          {percentLabel(share)} z celku
-        </div>
-      )}
-      <Change value={group.change} />
-    </div>
-  );
 }
 
 /** Přehled nahoře: kolik je celkem za měsíc a z čeho se to skládá. */
@@ -143,7 +54,7 @@ export function WealthSummary({
   };
   const total = sumOf((g) => g.value);
   const totalChange = sumOf((g) => g.change);
-  const positiveSum = values.reduce((s, g) => s + Math.max(g.value ?? 0, 0), 0);
+  const shares = sharesOf(values);
   const missing: Account[] = groups
     .flatMap((group) => group.accounts)
     .filter((account) => balanceOf(account.id, month) == null);
@@ -177,19 +88,23 @@ export function WealthSummary({
           </dl>
         )}
       </div>
-      <ShareBar groups={values} />
+      <div className="mt-4">
+        <ShareBar segments={values} />
+      </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {values.map((group) => (
-          <GroupTile
-            key={group.key}
-            group={group}
-            share={
-              positiveSum > 0 && (group.value ?? 0) > 0
-                ? (group.value ?? 0) / positiveSum
-                : null
-            }
-          />
-        ))}
+        {values.map((group) => {
+          const share = shares.get(group.key);
+          return (
+            <BreakdownTile key={group.key} segment={group}>
+              {share != null && (
+                <div className="text-xs text-slate-500">
+                  {percentLabel(share)} z celku
+                </div>
+              )}
+              <Change value={group.change} />
+            </BreakdownTile>
+          );
+        })}
       </div>
       {missing.length > 0 && (
         <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">

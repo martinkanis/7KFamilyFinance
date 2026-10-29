@@ -4,6 +4,7 @@ import {
   assetGroupOf,
 } from "@kkff/api/accountTypes";
 import type { Account, AccountBalance } from "@kkff/api/contracts";
+import { CATEGORICAL_COLORS } from "./chartColors";
 
 export type BalanceLookup = (accountId: number, month: string) => number | null;
 
@@ -66,13 +67,13 @@ export function latestRecordedMonth(
   );
 }
 
-// Pevné pořadí kategorických barev (ověřená paleta) – barva patří skupině.
+// Barva patří skupině, ne jejímu pořadí podle velikosti.
 export const ASSET_GROUP_COLORS: Record<AssetGroup, string> = {
-  bank: "#2a78d6",
-  savings: "#eb6834",
-  building: "#1baf7a",
-  investments: "#eda100",
-  other: "#e87ba4",
+  bank: CATEGORICAL_COLORS[0],
+  savings: CATEGORICAL_COLORS[1],
+  building: CATEGORICAL_COLORS[2],
+  investments: CATEGORICAL_COLORS[3],
+  other: CATEGORICAL_COLORS[4],
 };
 
 export interface AssetGroupRow {
