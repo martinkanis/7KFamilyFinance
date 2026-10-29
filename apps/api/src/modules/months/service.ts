@@ -1,12 +1,14 @@
 import { and, eq, gte, isNull } from "drizzle-orm";
 import type {
   EntryInput,
+  ItemEntryInput,
   MonthCorrection,
   MonthView,
   OneOffInput,
 } from "../../contracts.ts";
 import { db } from "../../db/index.ts";
 import { items, monthEntries, monthSettings } from "../../db/schema.ts";
+import type { ChangeValues } from "../../domain/itemChanges.ts";
 import {
   breakdownByAccount,
   buildMonthRows,
@@ -17,6 +19,7 @@ import { endingFrom } from "../../domain/schedule.ts";
 import { notFound, withDbErrors } from "../../lib/errors.ts";
 import { firstOrThrow, normalizeTexts } from "../../lib/normalize.ts";
 import { todayInPrague } from "../../lib/today.ts";
+import { upsertItemChange } from "../items/changes.ts";
 import {
   loadCorrection,
   loadEntriesOfMonth,
@@ -63,30 +66,44 @@ function isDefaultEntry(entry: EntryInput): boolean {
   );
 }
 
-/** Uloží stav a přepsání položky v měsíci; výchozí stav se neukládá. */
+/**
+ * Uloží stav a přepsání položky v měsíci; výchozí stav se neukládá.
+ * Hodnoty v `promote` se místo přepsání uloží jako změna položky od tohoto
+ * měsíce dál (ruční úpravy pozdějších měsíců zůstanou).
+ */
 export async function saveItemEntry(
   month: string,
   itemId: number,
-  input: EntryInput,
+  { promote = [], ...input }: ItemEntryInput,
 ): Promise<void> {
   const values = entryValues(input);
+  const change: ChangeValues = {};
+  for (const field of promote) {
+    if (values[field] != null) {
+      Object.assign(change, { [field]: values[field] });
+      Object.assign(values, { [field]: null });
+    }
+  }
   const sameEntry = and(
     eq(monthEntries.month, month),
     eq(monthEntries.itemId, itemId),
   );
-  if (isDefaultEntry(values)) {
-    await db.delete(monthEntries).where(sameEntry);
-    return;
-  }
-  await withDbErrors(ENTRY, () =>
-    db
-      .insert(monthEntries)
-      .values({ month, itemId, ...values })
-      .onConflictDoUpdate({
-        target: [monthEntries.month, monthEntries.itemId],
-        set: values,
-      }),
-  );
+  await db.transaction(async (tx) => {
+    await upsertItemChange(tx, itemId, month, change);
+    if (isDefaultEntry(values)) {
+      await tx.delete(monthEntries).where(sameEntry);
+      return;
+    }
+    await withDbErrors(ENTRY, () =>
+      tx
+        .insert(monthEntries)
+        .values({ month, itemId, ...values })
+        .onConflictDoUpdate({
+          target: [monthEntries.month, monthEntries.itemId],
+          set: values,
+        }),
+    );
+  });
 }
 
 export async function createOneOff(

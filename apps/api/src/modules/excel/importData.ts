@@ -5,6 +5,7 @@ import {
   accounts,
   counterparties,
   insurancePolicies,
+  itemChanges,
   items,
   monthEntries,
   monthSettings,
@@ -46,6 +47,7 @@ async function deleteAll(tx: Transaction): Promise<void> {
   await tx.delete(accountBalances);
   await tx.delete(monthEntries);
   await tx.delete(monthSettings);
+  await tx.delete(itemChanges);
   await tx.delete(items);
   await tx.delete(templates);
   await tx.delete(insurancePolicies);
@@ -190,6 +192,43 @@ async function insertEntries(
   return rows.length;
 }
 
+async function insertItemChanges(
+  tx: Transaction,
+  data: ImportData,
+  ids: { items: IdMap; accounts: IdMap },
+  refs: ReferenceResolver,
+): Promise<number> {
+  const rows = data.itemChanges.flatMap((change) => {
+    const context = `Změna položky ${change.itemCode} od ${change.fromMonth}`;
+    const itemId = refs.resolve(ids.items, change.itemCode, context);
+    if (itemId == null) {
+      return [];
+    }
+    return [
+      {
+        itemId,
+        fromMonth: change.fromMonth,
+        amount: change.amount,
+        dueDay: validDueDay(change.dueDay),
+        ourAccountId: refs.resolve(
+          ids.accounts,
+          change.ourAccountName,
+          `${context}, náš účet`,
+        ),
+        counterpartyAccount: change.counterpartyAccount,
+        vs: change.vs,
+      },
+    ];
+  });
+  const unique = new Map(
+    rows.map((row) => [`${row.itemId}|${row.fromMonth}`, row]),
+  );
+  if (unique.size > 0) {
+    await tx.insert(itemChanges).values([...unique.values()]);
+  }
+  return unique.size;
+}
+
 async function insertBalances(
   tx: Transaction,
   data: ImportData,
@@ -243,6 +282,12 @@ export function replaceAllData(data: ImportData): Promise<ImportResult> {
       },
       refs,
     );
+    const changeCount = await insertItemChanges(
+      tx,
+      data,
+      { items: itemIds, accounts: accountIds },
+      refs,
+    );
     const entryCount = await insertEntries(
       tx,
       data,
@@ -265,6 +310,7 @@ export function replaceAllData(data: ImportData): Promise<ImportResult> {
         šablony: templateIds.size,
         pojistky: data.insurance.length,
         položky: itemIds.size,
+        "změny položek": changeCount,
         "záznamy v měsících": entryCount,
         "korekce majetku": data.corrections.length,
         "zůstatky účtů": balanceCount,

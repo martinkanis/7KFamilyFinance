@@ -1,7 +1,7 @@
 import type {
+  ChangeableField,
   Direction,
   EntryInput,
-  MonthOverrides,
   MonthRow,
   MonthView,
   NamedRef,
@@ -130,7 +130,8 @@ export function dueDateIn(month: string, day: number): string {
   return `${month}-${String(Math.min(day, lastDay)).padStart(2, "0")}`;
 }
 
-const OVERRIDE_KEYS: (keyof MonthOverrides)[] = [
+/** Hodnoty, které jdou změnit pro jeden měsíc i od měsíce dál. */
+export const CHANGEABLE_FIELDS: ChangeableField[] = [
   "amount",
   "dueDay",
   "ourAccountId",
@@ -149,7 +150,7 @@ export function rowWithChanges(
   ourAccount?: NamedRef | null,
 ): MonthRow {
   const overrides = { ...row.overrides };
-  for (const key of OVERRIDE_KEYS) {
+  for (const key of CHANGEABLE_FIELDS) {
     if (changes[key] !== undefined) {
       Object.assign(overrides, { [key]: changes[key] });
     }
@@ -196,4 +197,11 @@ export function withCategoryRenamed(
         : row,
     ),
   };
+}
+
+/** Které měnitelné hodnoty úprava mění (null = návrat k výchozí se nepočítá). */
+export function changedFieldsOf(
+  changes: Partial<EntryInput>,
+): ChangeableField[] {
+  return CHANGEABLE_FIELDS.filter((field) => changes[field] != null);
 }

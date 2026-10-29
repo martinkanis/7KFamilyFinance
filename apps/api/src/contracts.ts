@@ -152,10 +152,34 @@ export interface MonthOverrides {
   vs: string | null;
 }
 
+/** Hodnoty položky, které jdou změnit pro jeden měsíc i od měsíce dál. */
+export type ChangeableField = keyof MonthOverrides;
+
+/** Změna položky platná od měsíce dál; null = beze změny. */
+export interface ItemChange extends MonthOverrides {
+  id: number;
+  itemId: number;
+  fromMonth: string;
+}
+
+/** Položka s hodnotami platnými v měsíci `effectiveFrom` a se seznamem změn. */
+export interface ItemWithChanges extends Item {
+  effectiveFrom: string;
+  changes: ItemChange[];
+}
+
+/** Úprava položky: měnitelné hodnoty platí od měsíce, „all“ = ve všech měsících. */
+export type ItemUpdate = ItemInput & { effectiveFrom?: string | null };
+
 export interface EntryInput extends MonthOverrides {
   status: PaymentStatus;
   paidOn: string | null;
   note: string | null;
+}
+
+/** Uložení položky v měsíci; `promote` = hodnoty, které mají platit i v dalších měsících. */
+export interface ItemEntryInput extends EntryInput {
+  promote?: ChangeableField[];
 }
 
 export interface OneOffInput extends EntryInput {

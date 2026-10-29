@@ -1,6 +1,8 @@
 import type {
+  ChangeableField,
   Direction,
   EntryInput,
+  ItemEntryInput,
   MonthRow,
   MonthView,
   OneOffInput,
@@ -9,7 +11,7 @@ import type {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useParams } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { AccountBreakdown } from "@/components/month/AccountBreakdown";
 import {
   DIRECTION_PANEL_ID,
@@ -18,6 +20,7 @@ import {
 } from "@/components/month/DirectionTabs";
 import { EmptyMonth } from "@/components/month/EmptyMonth";
 import { EntryDialog } from "@/components/month/EntryDialog";
+import { ForwardOffer } from "@/components/month/ForwardOffer";
 import { MonthOverview } from "@/components/month/MonthOverview";
 import {
   type Filters,
@@ -41,6 +44,7 @@ import {
 } from "@/lib/format";
 import { parseOptionalNumber, textOrNull, toText } from "@/lib/formValues";
 import {
+  changedFieldsOf,
   entryInputOf,
   isPayable,
   itemEntryWithStatus,
@@ -129,7 +133,7 @@ function removeRow(month: string, row: MonthRow) {
     : Promise.reject(new MissingRowIdError(row));
 }
 
-function saveItemEntry(month: string, row: MonthRow, input: EntryInput) {
+function saveItemEntry(month: string, row: MonthRow, input: ItemEntryInput) {
   const { itemId } = row;
   return itemId != null
     ? api.saveItemEntry(month, itemId, input)
@@ -290,6 +294,14 @@ export function MonthPage() {
   const [editing, setEditing] = useState<Editing>(null);
   const [qrQueue, setQrQueue] = useState<string[] | null>(null);
   const [invalidEdit, setInvalidEdit] = useState<string | null>(null);
+  const [forwardOffer, setForwardOffer] = useState<{
+    id: number;
+    rowKey: string;
+    name: string;
+    fields: ChangeableField[];
+  } | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: nabídka patří k měsíci, při přechodu jinam zmizí
+  useEffect(() => setForwardOffer(null), [month]);
 
   if (!isValidMonth) {
     return <Navigate to="/mesic/$month" params={{ month: currentMonth() }} />;
@@ -345,6 +357,31 @@ export function MonthPage() {
       ),
     );
     save.mutate(() => saveRowChanges(month, row, changes));
+    const fields = changedFieldsOf(changes);
+    if (!row.isOneOff && fields.length > 0) {
+      setForwardOffer({
+        id: Date.now(),
+        rowKey: row.key,
+        name: row.name,
+        fields,
+      });
+    }
+  };
+
+  /** Úprava z tabulky platí i pro další měsíce – stane se změnou položky. */
+  const applyForward = () => {
+    const offer = forwardOffer;
+    setForwardOffer(null);
+    const row = offer && view.data.rows.find((r) => r.key === offer.rowKey);
+    if (!offer || !row) return;
+    save.mutate(async () => {
+      const updated = await saveItemEntry(month, row, {
+        ...entryInputOf(row),
+        promote: offer.fields,
+      });
+      refreshOtherMonths();
+      return updated;
+    });
   };
 
   const renameRow = (row: MonthRow, name: string) => {
@@ -367,10 +404,20 @@ export function MonthPage() {
     });
   };
 
-  const onSaveEntry = (row: MonthRow) => (input: EntryInput) =>
-    save.mutate(() => saveItemEntry(month, row, input), {
-      onSuccess: closeEditing,
-    });
+  const onSaveEntry =
+    (row: MonthRow) => (input: EntryInput, forward: boolean) =>
+      save.mutate(
+        async () => {
+          const promote = forward ? changedFieldsOf(input) : [];
+          const updated = await saveItemEntry(month, row, {
+            ...input,
+            promote,
+          });
+          if (promote.length > 0) refreshOtherMonths();
+          return updated;
+        },
+        { onSuccess: closeEditing },
+      );
 
   const onSaveOneOff = (row: MonthRow | null) => (input: OneOffInput) =>
     save.mutate(() => saveOneOff(month, row, input), {
@@ -489,6 +536,16 @@ export function MonthPage() {
           onSave={onSaveOneOff(editing.row)}
           onDelete={deleteRow}
           onClose={closeEditing}
+        />
+      )}
+      {forwardOffer && (
+        <ForwardOffer
+          offerKey={String(forwardOffer.id)}
+          month={month}
+          name={forwardOffer.name}
+          disabled={save.isPending}
+          onApply={applyForward}
+          onDismiss={() => setForwardOffer(null)}
         />
       )}
       {qrQueue && (

@@ -471,6 +471,54 @@ function writeBalancesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
   setColumnWidths(sheet, [34, ...months.map(() => 14)]);
 }
 
+/** Změny položek od měsíce dál; jde zpět importovat. */
+function writeItemChangesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
+  const sheet = wb.addWorksheet(SHEETS.itemChanges, {
+    views: [{ state: "frozen", ySplit: TABLE_HEADER_ROW }],
+  });
+  writeTitle(
+    sheet,
+    "Změny položek od měsíce",
+    "Od uvedeného měsíce dál platí vyplněné hodnoty; prázdné = beze změny.",
+  );
+  writeHeaderRow(sheet, TABLE_HEADER_ROW, [
+    "ID položky",
+    "Platí od",
+    "Částka",
+    "Den splatnosti",
+    "Náš účet (z / na)",
+    "Účet protistrany",
+    "VS",
+  ]);
+  const { catalog } = input;
+  const codes = new Map(catalog.items.map((item) => [item.id, item.code]));
+  const accounts = nameById(catalog.accounts);
+  const changes = catalog.itemChanges
+    .filter((change) => codes.has(change.itemId))
+    .sort(
+      (a, b) =>
+        (codes.get(a.itemId) ?? "").localeCompare(codes.get(b.itemId) ?? "") ||
+        a.fromMonth.localeCompare(b.fromMonth),
+    );
+  writeRows(
+    sheet,
+    FIRST_TABLE_ROW,
+    changes.map((change) => [
+      codes.get(change.itemId) ?? null,
+      change.fromMonth,
+      change.amount,
+      change.dueDay,
+      change.ourAccountId == null
+        ? null
+        : (accounts.get(change.ourAccountId) ?? null),
+      change.counterpartyAccount,
+      change.vs,
+    ]),
+  );
+  formatColumns(sheet, [3], MONEY_FORMAT);
+  setColumnWidths(sheet, [11, 10, 13, 9, 22, 21, 11]);
+}
+
 export function buildExportWorkbook(input: ExportInput): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
   wb.creator = "7KFamilyFinance";
@@ -481,6 +529,7 @@ export function buildExportWorkbook(input: ExportInput): ExcelJS.Workbook {
     writeMonthSheet(wb, view, accountNames);
   }
   writeItemsSheet(wb, input, insuranceReserveRow(input.insurance.length));
+  writeItemChangesSheet(wb, input);
   writeAccountsSheet(wb, input);
   writeBalancesSheet(wb, input);
   writeTemplatesSheet(wb, input);

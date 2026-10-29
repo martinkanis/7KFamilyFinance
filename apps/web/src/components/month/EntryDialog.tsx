@@ -25,7 +25,8 @@ interface EntryDialogProps {
   accounts: Account[];
   isSaving: boolean;
   error: unknown;
-  onSave: (input: EntryInput) => void;
+  /** `forward` = vyplněné hodnoty platí i pro další měsíce (změna položky). */
+  onSave: (input: EntryInput, forward: boolean) => void;
   onClose: () => void;
 }
 
@@ -81,6 +82,7 @@ export function EntryDialog({
 }: EntryDialogProps) {
   const [form, setForm] = useState(() => initialForm(row));
   const [formError, setFormError] = useState<string | null>(null);
+  const [forward, setForward] = useState(false);
   const set = (field: keyof EntryForm) => (value: string) =>
     setForm({ ...form, [field]: value });
 
@@ -91,7 +93,7 @@ export function EntryDialog({
       setFormError(input);
       return;
     }
-    onSave(input);
+    onSave(input, forward);
   };
 
   const shownError = formError ? new Error(formError) : error;
@@ -156,10 +158,36 @@ export function EntryDialog({
             onChange={(e) => set("paidOn")(e.target.value)}
           />
         </Field>
-        <p className="text-xs text-slate-500 sm:col-span-2">
-          Pole níže platí jen pro tento měsíc. Prázdné = výchozí hodnota z
-          položky (šablony).
-        </p>
+        <fieldset className="sm:col-span-2">
+          <legend className="text-sm font-medium text-slate-700">
+            Částka, splatnost, účty a VS platí
+          </legend>
+          <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="entry-scope"
+                checked={!forward}
+                onChange={() => setForward(false)}
+              />
+              jen pro tento měsíc
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="entry-scope"
+                checked={forward}
+                onChange={() => setForward(true)}
+              />
+              od tohoto měsíce dál
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {forward
+              ? "Vyplněné hodnoty se uloží do položky od tohoto měsíce dál; minulé měsíce ani ručně upravené další měsíce se nezmění."
+              : "Prázdné pole = výchozí hodnota z položky (šablony)."}
+          </p>
+        </fieldset>
         <Field label="Částka" hint={amountHint(row)}>
           <Input
             inputMode="decimal"

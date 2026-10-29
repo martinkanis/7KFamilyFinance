@@ -71,6 +71,16 @@ export interface ImportedEntry {
   counterpartyName: string | null;
 }
 
+export interface ImportedItemChange {
+  itemCode: string;
+  fromMonth: string;
+  amount: number | null;
+  dueDay: number | null;
+  ourAccountName: string | null;
+  counterpartyAccount: string | null;
+  vs: string | null;
+}
+
 export interface ImportedBalance {
   accountName: string;
   month: string;
@@ -84,6 +94,7 @@ export interface ImportData {
   templates: ImportedTemplate[];
   insurance: InsurancePolicyInput[];
   items: ImportedItem[];
+  itemChanges: ImportedItemChange[];
   entries: ImportedEntry[];
   corrections: { month: string; amount: number }[];
   balances: ImportedBalance[];
@@ -424,6 +435,29 @@ function parseBalances(wb: ExcelJS.Workbook): ImportedBalance[] {
     );
 }
 
+/** List „Změny položek“ z exportu aplikace. Volitelný. */
+function parseItemChanges(wb: ExcelJS.Workbook): ImportedItemChange[] {
+  const sheet = wb.getWorksheet(SHEETS.itemChanges);
+  return rowsWithKey(sheet, FIRST_TABLE_ROW, 1).flatMap((cell) => {
+    const itemCode = textOf(cell(1));
+    const fromMonth = balanceMonthOf(cell(2));
+    if (itemCode == null || fromMonth == null) {
+      return [];
+    }
+    return [
+      {
+        itemCode,
+        fromMonth,
+        amount: numberOf(cell(3)),
+        dueDay: numberOf(cell(4)),
+        ourAccountName: textOf(cell(5)),
+        counterpartyAccount: textOf(cell(6)),
+        vs: textOf(cell(7)),
+      },
+    ];
+  });
+}
+
 function requireSheets(wb: ExcelJS.Workbook): void {
   const missing = [SHEETS.items, SHEETS.accounts].filter(
     (name) => !wb.getWorksheet(name),
@@ -469,6 +503,7 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<ImportData> {
       "Položka",
       warnings,
     ),
+    itemChanges: parseItemChanges(wb),
     entries: parseMonthSheets(wb),
     corrections: parseCorrections(wb),
     balances: parseBalances(wb),

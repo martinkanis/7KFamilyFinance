@@ -5,6 +5,7 @@ import {
   accounts,
   counterparties,
   insurancePolicies,
+  itemChanges,
   items,
   monthEntries,
   monthSettings,
@@ -20,22 +21,30 @@ import {
 export async function loadPlannerCatalog(
   executor: Executor = db,
 ): Promise<PlannerCatalog> {
-  const [itemRows, templateRows, counterpartyRows, accountRows, policies] =
-    await Promise.all([
-      executor.select().from(items).orderBy(asc(items.sortOrder)),
-      executor.select().from(templates).orderBy(asc(templates.code)),
-      executor.select().from(counterparties).orderBy(asc(counterparties.name)),
-      executor.select().from(accounts).orderBy(asc(accounts.sortOrder)),
-      executor
-        .select()
-        .from(insurancePolicies)
-        .orderBy(asc(insurancePolicies.id)),
-    ]);
+  const [
+    itemRows,
+    templateRows,
+    counterpartyRows,
+    accountRows,
+    policies,
+    changeRows,
+  ] = await Promise.all([
+    executor.select().from(items).orderBy(asc(items.sortOrder)),
+    executor.select().from(templates).orderBy(asc(templates.code)),
+    executor.select().from(counterparties).orderBy(asc(counterparties.name)),
+    executor.select().from(accounts).orderBy(asc(accounts.sortOrder)),
+    executor
+      .select()
+      .from(insurancePolicies)
+      .orderBy(asc(insurancePolicies.id)),
+    executor.select().from(itemChanges),
+  ]);
   return {
     items: itemRows,
     templates: templateRows,
     counterparties: counterpartyRows,
     accounts: accountRows,
+    itemChanges: changeRows,
     insuranceReserve: insuranceReserveOf(
       policies.map((policy) => policy.annualAmount),
     ),

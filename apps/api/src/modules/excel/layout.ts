@@ -10,6 +10,7 @@ export const SHEETS = {
   templates: "Šablony",
   insurance: "Pojistky",
   balances: "Stav účtů",
+  itemChanges: "Změny položek",
 } as const;
 
 export const MONTH_SHEET_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;

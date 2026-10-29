@@ -48,6 +48,18 @@ const catalog: PlannerCatalog = {
   templates: [makeTemplate({ counterpartyId: 1 })],
   counterparties: [makeCounterparty()],
   accounts: [makeAccount({ initialBalance: 1000 })],
+  itemChanges: [
+    {
+      id: 1,
+      itemId: 1,
+      fromMonth: "2026-12",
+      amount: 1250,
+      dueDay: null,
+      ourAccountId: 1,
+      counterpartyAccount: null,
+      vs: "77",
+    },
+  ],
   insuranceReserve: 1000,
 };
 
@@ -127,6 +139,21 @@ describe("export → import", () => {
       amountFromInsurance: true,
       amount: null,
     });
+  });
+
+  it("zachová změny položek od měsíce", async () => {
+    const { itemChanges } = await exportAndParse();
+    expect(itemChanges).toEqual([
+      {
+        itemCode: "V01",
+        fromMonth: "2026-12",
+        amount: 1250,
+        dueDay: null,
+        ourAccountName: "Air – společný",
+        counterpartyAccount: null,
+        vs: "77",
+      },
+    ]);
   });
 
   it("zachová měsíční zůstatky účtů bez součtového řádku", async () => {

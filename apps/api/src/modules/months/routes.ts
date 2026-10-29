@@ -35,7 +35,18 @@ const entryFields = {
   vs: nullableText(10),
 };
 
-const entryBody = t.Object(entryFields);
+const changeableField = t.Union([
+  t.Literal("amount"),
+  t.Literal("dueDay"),
+  t.Literal("ourAccountId"),
+  t.Literal("counterpartyAccount"),
+  t.Literal("vs"),
+]);
+
+const itemEntryBody = t.Object({
+  ...entryFields,
+  promote: t.Optional(t.Array(changeableField, { maxItems: 5 })),
+});
 
 const oneOffBody = t.Object({
   ...entryFields,
@@ -66,7 +77,7 @@ export const monthRoutes = new Elysia({ prefix: "/api/months/:month" })
       await saveItemEntry(params.month, params.itemId, body);
       return getMonthView(params.month);
     },
-    { params: monthItemParams, body: entryBody },
+    { params: monthItemParams, body: itemEntryBody },
   )
   .delete(
     "/items/:itemId",

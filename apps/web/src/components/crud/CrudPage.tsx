@@ -53,6 +53,8 @@ export interface CrudConfig<R extends Resource> {
   rowClassName?: (row: Resources[R]) => string;
   /** Co dalšího smazání způsobí – ukáže se v potvrzení. */
   deleteWarning?: string;
+  /** Doplňující obsah dialogu u existujícího záznamu (`close` dialog zavře). */
+  dialogExtra?: (row: Resources[R], close: () => void) => ReactNode;
 }
 
 function confirmDelete<R extends Resource>(
@@ -277,6 +279,7 @@ function EditDialog<R extends Resource>({
           </div>
         )}
       </form>
+      {row && config.dialogExtra?.(row, onClose)}
     </Dialog>
   );
 }

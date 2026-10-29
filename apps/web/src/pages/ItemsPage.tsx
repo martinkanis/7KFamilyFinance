@@ -1,23 +1,43 @@
 import type {
   Account,
   Counterparty,
-  Item,
+  ItemWithChanges,
   Template,
 } from "@kkff/api/contracts";
 import { useQuery } from "@tanstack/react-query";
 import { type CrudConfig, CrudPage } from "@/components/crud/CrudPage";
+import { ItemChanges } from "@/components/crud/ItemChanges";
 import { operatingAccountsWith } from "@/lib/accounts";
 import { api } from "@/lib/api";
-import { formatMoney } from "@/lib/format";
+import {
+  addMonths,
+  currentMonth,
+  formatMoney,
+  monthLabel,
+  shortMonthLabel,
+} from "@/lib/format";
 
 interface Lookups {
   accounts: Account[];
   counterparties: Counterparty[];
   templates: Template[];
-  items: Item[];
+  items: ItemWithChanges[];
 }
 
-function amountLabel(item: Item, templates: Map<number, Template>): string {
+/** Nejbližší budoucí změna částky, např. „→ 3 500 Kč od 11/26“. */
+function upcomingAmount(item: ItemWithChanges): string | null {
+  const next = item.changes.find(
+    (change) => change.fromMonth > item.effectiveFrom && change.amount != null,
+  );
+  return next
+    ? `→ ${formatMoney(next.amount)} od ${shortMonthLabel(next.fromMonth)}`
+    : null;
+}
+
+function amountLabel(
+  item: ItemWithChanges,
+  templates: Map<number, Template>,
+): string {
   if (item.amountFromInsurance) {
     return "z pojistek";
   }
@@ -31,7 +51,7 @@ function amountLabel(item: Item, templates: Map<number, Template>): string {
     : "–";
 }
 
-function scheduleLabel(item: Item): string {
+function scheduleLabel(item: ItemWithChanges): string {
   const day = item.dueDay ? `${item.dueDay}.` : "";
   const months = item.dueMonths ? `v měs. ${item.dueMonths}` : "každý měsíc";
   return [day, months].filter(Boolean).join(" ");
@@ -44,6 +64,8 @@ function itemsConfig(lookups: Lookups): CrudConfig<"items"> {
   );
   const templates = new Map(lookups.templates.map((t) => [t.id, t]));
   const categories = [...new Set(lookups.items.map((item) => item.category))];
+  const thisMonth = currentMonth();
+  const nextMonth = addMonths(thisMonth, 1);
   return {
     resource: "items",
     copySuffixKeys: ["code"],
@@ -52,12 +74,15 @@ function itemsConfig(lookups: Lookups): CrudConfig<"items"> {
     accusative: "položku",
     description:
       "Pravidelné platby a příjmy – výchozí hodnoty pro všechny měsíce. Hodnoty z šablony se použijí, když je pole v položce prázdné.",
-    searchText: (i: Item) =>
+    searchText: (i: ItemWithChanges) =>
       `${i.code} ${i.name} ${i.category} ${i.note ?? ""}`,
     rowClassName: (i) => (i.active ? "" : "text-slate-400"),
     deleteWarning:
       "Zmizí ze všech měsíců včetně minulých a smaže se i historie zaplacení. Když platba jen končí, ukonči ji raději košem na stránce měsíce – minulé měsíce zůstanou.",
-    defaults: { direction: "expense", active: true },
+    defaults: { direction: "expense", active: true, effectiveFrom: thisMonth },
+    dialogExtra: (item, close) => (
+      <ItemChanges item={item} accounts={lookups.accounts} onChanged={close} />
+    ),
     columns: [
       {
         label: "ID",
@@ -71,7 +96,17 @@ function itemsConfig(lookups: Lookups): CrudConfig<"items"> {
       {
         label: "Částka",
         align: "right",
-        render: (i) => amountLabel(i, templates),
+        render: (i) => {
+          const upcoming = upcomingAmount(i);
+          return (
+            <>
+              {amountLabel(i, templates)}
+              {upcoming && (
+                <div className="text-xs text-amber-700">{upcoming}</div>
+              )}
+            </>
+          );
+        },
       },
       { label: "Splatnost", render: scheduleLabel },
       {
@@ -120,6 +155,25 @@ function itemsConfig(lookups: Lookups): CrudConfig<"items"> {
           value: category,
           label: category,
         })),
+      },
+      {
+        key: "effectiveFrom",
+        label: "Změny částky, splatnosti, účtů a VS platí",
+        kind: "select",
+        required: true,
+        wide: true,
+        hint: "Minulé měsíce zůstanou. Ostatní údaje (název, kategorie…) platí vždy ve všech měsících.",
+        options: [
+          {
+            value: thisMonth,
+            label: `od tohoto měsíce (${monthLabel(thisMonth)})`,
+          },
+          {
+            value: nextMonth,
+            label: `od příštího měsíce (${monthLabel(nextMonth)})`,
+          },
+          { value: "all", label: "ve všech měsících, i minulých" },
+        ],
       },
       {
         key: "amount",

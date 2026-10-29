@@ -127,6 +127,39 @@ export const items = pgTable(
   ],
 );
 
+/**
+ * Změna hodnot položky platná od měsíce dál (nová záloha, zdražení…).
+ * Prázdné pole = beze změny; minulé měsíce se tím nepřepíšou.
+ */
+export const itemChanges = pgTable(
+  "item_changes",
+  {
+    id: serial().primaryKey(),
+    itemId: integer()
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    fromMonth: text().notNull(),
+    amount: money(),
+    dueDay: integer(),
+    ourAccountId: integer().references(() => accounts.id, {
+      onDelete: "set null",
+    }),
+    counterpartyAccount: text(),
+    vs: text(),
+  },
+  (table) => [
+    uniqueIndex("item_changes_item_month").on(table.itemId, table.fromMonth),
+    check(
+      "item_changes_month_format",
+      sql`${table.fromMonth} ~ '^\\d{4}-\\d{2}$'`,
+    ),
+    check(
+      "item_changes_due_day_range",
+      sql`${table.dueDay} is null or ${table.dueDay} between 1 and 31`,
+    ),
+  ],
+);
+
 /** Stav a přepsání položky v měsíci; bez itemId jde o jednorázovou platbu. */
 export const monthEntries = pgTable(
   "month_entries",

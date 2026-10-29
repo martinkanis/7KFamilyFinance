@@ -7,13 +7,14 @@ import type {
   CategoryRenameResult,
   Counterparty,
   CurrentUser,
-  EntryInput,
   ExcelBalanceAssignment,
   ExcelBalanceBlock,
   ImportResult,
   InsurancePolicy,
   Item,
+  ItemEntryInput,
   ItemRename,
+  ItemWithChanges,
   MonthCorrection,
   MonthView,
   OneOffInput,
@@ -69,7 +70,7 @@ export interface Resources {
   counterparties: Counterparty;
   templates: Template;
   insurance: InsurancePolicy;
-  items: Item;
+  items: ItemWithChanges;
 }
 
 export type Resource = keyof Resources;
@@ -93,11 +94,16 @@ export const api = {
 
   renameItem: (id: number, rename: ItemRename) =>
     request<Item>("PATCH", `/api/items/${id}`, rename),
+  deleteItemChange: (itemId: number, changeId: number) =>
+    request<ItemWithChanges>(
+      "DELETE",
+      `/api/items/${itemId}/changes/${changeId}`,
+    ),
   renameCategory: (rename: CategoryRename) =>
     request<CategoryRenameResult>("POST", "/api/items/rename-category", rename),
 
   month: (month: string) => request<MonthView>("GET", `/api/months/${month}`),
-  saveItemEntry: (month: string, itemId: number, input: EntryInput) =>
+  saveItemEntry: (month: string, itemId: number, input: ItemEntryInput) =>
     request<MonthView>("PUT", `/api/months/${month}/items/${itemId}`, input),
   /** Pravidelná položka od tohoto měsíce končí (minulé měsíce zůstanou). */
   endItem: (month: string, itemId: number) =>

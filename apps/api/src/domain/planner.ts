@@ -5,11 +5,13 @@ import type {
   Direction,
   DirectionSummary,
   Item,
+  ItemChange,
   MonthRow,
   MonthSummary,
   PaymentStatus,
   Template,
 } from "../contracts.ts";
+import { itemAsOf } from "./itemChanges.ts";
 import { dueDateIn } from "./month.ts";
 import { isItemDueInMonth } from "./schedule.ts";
 
@@ -37,6 +39,8 @@ export interface PlannerCatalog {
   templates: Template[];
   counterparties: Counterparty[];
   accounts: Account[];
+  /** Změny položek od měsíce dál. */
+  itemChanges: ItemChange[];
   insuranceReserve: number;
 }
 
@@ -45,6 +49,7 @@ interface CatalogIndex {
   templates: Map<number, Template>;
   counterparties: Map<number, Counterparty>;
   accounts: Map<number, Account>;
+  changesByItem: Map<number, ItemChange[]>;
   categoryRank: Map<string, number>;
 }
 
@@ -80,8 +85,17 @@ export function indexCatalog(catalog: PlannerCatalog): CatalogIndex {
     templates: indexById(catalog.templates),
     counterparties: indexById(catalog.counterparties),
     accounts: indexById(catalog.accounts),
+    changesByItem: groupChangesByItem(catalog.itemChanges),
     categoryRank: rankCategories(catalog.items),
   };
+}
+
+function groupChangesByItem(changes: ItemChange[]): Map<number, ItemChange[]> {
+  const byItem = new Map<number, ItemChange[]>();
+  for (const change of changes) {
+    byItem.set(change.itemId, [...(byItem.get(change.itemId) ?? []), change]);
+  }
+  return byItem;
 }
 
 export function insuranceReserveOf(annualAmounts: number[]): number {
@@ -247,7 +261,14 @@ export function buildMonthRows(
   );
   const itemRows = index.catalog.items
     .filter((item) => item.active || entryByItem.has(item.id))
-    .map((item) => buildItemRow(month, item, entryByItem.get(item.id), index));
+    .map((item) =>
+      buildItemRow(
+        month,
+        itemAsOf(item, index.changesByItem.get(item.id) ?? [], month),
+        entryByItem.get(item.id),
+        index,
+      ),
+    );
   const oneOffRows = entries
     .filter((entry) => entry.itemId == null)
     .map((entry) => buildOneOffRow(month, entry, index));

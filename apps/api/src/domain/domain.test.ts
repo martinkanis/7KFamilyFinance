@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { ItemChange } from "../contracts.ts";
 import { suggestAccount } from "./accountMatch.ts";
 import {
   assetGroupOf,
@@ -6,6 +7,7 @@ import {
   normalizeAccountType,
 } from "./accountTypes.ts";
 import { actualWealthByMonth } from "./balances.ts";
+import { changedValues, itemAsOf } from "./itemChanges.ts";
 import { addMonths, dueDateIn, monthRange, nearestMonthKey } from "./month.ts";
 import {
   breakdownByAccount,
@@ -31,6 +33,7 @@ function catalog(overrides: Partial<PlannerCatalog> = {}): PlannerCatalog {
     templates: [],
     counterparties: [],
     accounts: [],
+    itemChanges: [],
     insuranceReserve: 0,
     ...overrides,
   };
@@ -88,6 +91,60 @@ describe("splatnost položky", () => {
     expect(isItemDueInMonth(makeItem({ active: false }), "2026-11")).toBe(
       false,
     );
+  });
+});
+
+describe("změny položky od měsíce", () => {
+  const change = (fromMonth: string, values: Partial<ItemChange>) => ({
+    id: 0,
+    itemId: 1,
+    fromMonth,
+    amount: null,
+    dueDay: null,
+    ourAccountId: null,
+    counterpartyAccount: null,
+    vs: null,
+    ...values,
+  });
+  const item = makeItem({ id: 1, amount: 3200, dueDay: 15, vs: "111" });
+  const changes = [
+    change("2026-11", { amount: 3500 }),
+    change("2027-02", { dueDay: 20, amount: 3600 }),
+  ];
+
+  it("minulé měsíce zůstanou, další se řídí změnou", () => {
+    expect(itemAsOf(item, changes, "2026-10").amount).toBe(3200);
+    expect(itemAsOf(item, changes, "2026-11").amount).toBe(3500);
+    expect(itemAsOf(item, changes, "2027-01")).toMatchObject({
+      amount: 3500,
+      dueDay: 15,
+    });
+    expect(itemAsOf(item, changes, "2027-02")).toMatchObject({
+      amount: 3600,
+      dueDay: 20,
+      vs: "111",
+    });
+  });
+
+  it("změny jiné položky se nepoužijí", () => {
+    const other = { ...change("2026-01", { amount: 1 }), itemId: 2 };
+    expect(itemAsOf(item, [other], "2026-10").amount).toBe(3200);
+  });
+
+  it("řádek měsíce použije změnu, ruční úprava měsíce má přednost", () => {
+    const index = indexCatalog(
+      catalog({ items: [item], itemChanges: changes }),
+    );
+    expect(buildMonthRows("2026-10", index, [])[0]?.amount).toBe(3200);
+    expect(buildMonthRows("2026-12", index, [])[0]?.amount).toBe(3500);
+    const override = makeEntry({ itemId: 1, month: "2026-12", amount: 3300 });
+    expect(buildMonthRows("2026-12", index, [override])[0]?.amount).toBe(3300);
+  });
+
+  it("najde změněné hodnoty", () => {
+    expect(changedValues(item, { ...item, amount: 3500, vs: "111" })).toEqual({
+      amount: 3500,
+    });
   });
 });
 
