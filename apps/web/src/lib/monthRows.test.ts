@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { MonthRow, MonthView } from "@kkff/api/contracts";
 import {
+  copyOf,
   dueDateIn,
   groupByCategory,
   moveCategory,
@@ -219,5 +220,26 @@ describe("přetahování", () => {
       "B",
     ]);
     expect(moveCategory(["A", "B"], "A", "A", false)).toBeNull();
+  });
+});
+
+describe("duplikování platby", () => {
+  it("zkopíruje platné hodnoty a druh platby, stav ne", () => {
+    expect(
+      copyOf({ ...row, status: "paid", ourAccount: { id: 3, name: "Účet" } }),
+    ).toEqual({
+      direction: "expense",
+      category: "Bydlení",
+      name: "Energie",
+      amount: 3200,
+      dueDay: 15,
+      ourAccountId: 3,
+      counterpartyId: null,
+      counterpartyAccount: "123/0800",
+      vs: "111",
+      note: null,
+      recurring: true,
+    });
+    expect(copyOf({ ...row, isOneOff: true }).recurring).toBe(false);
   });
 });

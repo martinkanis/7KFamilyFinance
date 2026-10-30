@@ -54,6 +54,7 @@ import {
 import { parseOptionalNumber, textOrNull, toText } from "@/lib/formValues";
 import {
   changedFieldsOf,
+  copyOf,
   entryInputOf,
   isPayable,
   itemEntryWithStatus,
@@ -109,7 +110,13 @@ const MONTH_SAVE_KEY = "month-save";
 
 type Editing =
   | { kind: "entry"; row: MonthRow }
-  | { kind: "oneOff"; row: MonthRow | null; preset?: PaymentPreset }
+  | {
+      kind: "oneOff";
+      row: MonthRow | null;
+      preset?: PaymentPreset;
+      /** Kopie se po uložení položí hned pod tento řádek. */
+      copyOfKey?: string;
+    }
   | null;
 
 function matchesFilters(row: MonthRow, filters: Filters): boolean {
@@ -477,17 +484,55 @@ export function MonthPage() {
         { onSuccess: closeEditing },
       );
 
+  /** Kopii položí hned pod originál (nová platba je jinak na konci kategorie). */
+  const placeAfter = async (
+    before: MonthView,
+    after: MonthView,
+    originalKey: string,
+  ): Promise<MonthView> => {
+    const known = new Set(before.rows.map((r) => r.key));
+    const created = after.rows.find((r) => !known.has(r.key));
+    const original = after.rows.find((r) => r.key === originalKey);
+    if (!created || !original || created.category !== original.category) {
+      return after;
+    }
+    const moved = moveRow(after.rows, created.key, {
+      category: original.category,
+      anchorKey: original.key,
+      after: true,
+    });
+    return moved
+      ? api.reorderRows(month, {
+          direction: created.direction,
+          name: created.category,
+          rows: moved.categoryRows,
+        })
+      : after;
+  };
+
   const onSaveOneOff =
-    (row: MonthRow | null) => (input: OneOffInput, recurring: boolean) =>
+    (row: MonthRow | null, copyOfKey?: string) =>
+    (input: OneOffInput, recurring: boolean) =>
       save.mutate(
         async () => {
-          if (!recurring) return saveOneOff(month, row, input);
-          const updated = await api.createRecurring(month, input);
-          refreshOtherMonths();
+          const before = view.data;
+          let updated = recurring
+            ? await api.createRecurring(month, input)
+            : await saveOneOff(month, row, input);
+          if (copyOfKey) updated = await placeAfter(before, updated, copyOfKey);
+          if (recurring) refreshOtherMonths();
           return updated;
         },
         { onSuccess: closeEditing },
       );
+
+  const duplicateRow = (row: MonthRow) =>
+    setEditing({
+      kind: "oneOff",
+      row: null,
+      preset: { ...copyOf(row), title: `Kopie platby „${row.name}“` },
+      copyOfKey: row.key,
+    });
 
   const deleteRow = (row: MonthRow) => {
     if (!window.confirm(deleteQuestion(month, row))) return;
@@ -593,6 +638,7 @@ export function MonthPage() {
     onRename: renameRow,
     onRenameCategory: renameCategory,
     onDelete: deleteRow,
+    onDuplicate: duplicateRow,
     onInvalid: setInvalidEdit,
     onStatus: (row: MonthRow, status: PaymentStatus) =>
       void changeStatus(row, status),
@@ -696,7 +742,7 @@ export function MonthPage() {
           categories={categories}
           isSaving={save.isPending}
           error={save.error}
-          onSave={onSaveOneOff(editing.row)}
+          onSave={onSaveOneOff(editing.row, editing.copyOfKey)}
           onDelete={deleteRow}
           onClose={closeEditing}
         />

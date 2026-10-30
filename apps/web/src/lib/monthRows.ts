@@ -319,3 +319,20 @@ export function moveCategory(
   rest.splice(index + (after ? 1 : 0), 0, dragged);
   return rest;
 }
+
+/** Hodnoty pro kopii platby (stav se nekopíruje – kopie je nezaplacená). */
+export function copyOf(row: MonthRow) {
+  return {
+    direction: row.direction,
+    category: row.category,
+    name: row.name,
+    amount: row.amount,
+    dueDay: row.dueDate ? Number(row.dueDate.slice(8)) : null,
+    ourAccountId: row.ourAccount?.id ?? null,
+    counterpartyId: row.counterparty?.id ?? null,
+    counterpartyAccount: row.counterpartyAccount,
+    vs: row.vs,
+    note: row.note,
+    recurring: !row.isOneOff,
+  };
+}

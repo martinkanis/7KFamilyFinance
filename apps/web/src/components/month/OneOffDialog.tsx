@@ -21,10 +21,12 @@ import {
 } from "@/lib/formValues";
 import { AccountOptions, CounterpartyOptions, StatusOptions } from "./options";
 
-/** Předvyplnění nové platby (např. „+“ u kategorie). */
-export interface PaymentPreset {
+/** Předvyplnění nové platby („+“ u kategorie, nebo kopie jiné platby). */
+export interface PaymentPreset extends Partial<Omit<OneOffInput, "status">> {
   direction: Direction;
   category: string;
+  recurring?: boolean;
+  title?: string;
 }
 
 interface OneOffDialogProps {
@@ -45,16 +47,18 @@ function initialForm(row: MonthRow | null, preset?: PaymentPreset) {
   return {
     direction: row?.direction ?? preset?.direction ?? ("expense" as Direction),
     category: row?.category ?? preset?.category ?? "",
-    name: row?.name ?? "",
-    amount: toText(row?.amount),
-    counterpartyId: toText(row?.counterparty?.id),
-    ourAccountId: toText(row?.overrides.ourAccountId),
-    counterpartyAccount: toText(row?.overrides.counterpartyAccount),
-    vs: toText(row?.overrides.vs),
-    dueDay: toText(row?.overrides.dueDay),
+    name: row?.name ?? preset?.name ?? "",
+    amount: toText(row?.amount ?? preset?.amount),
+    counterpartyId: toText(row?.counterparty?.id ?? preset?.counterpartyId),
+    ourAccountId: toText(row?.overrides.ourAccountId ?? preset?.ourAccountId),
+    counterpartyAccount: toText(
+      row?.overrides.counterpartyAccount ?? preset?.counterpartyAccount,
+    ),
+    vs: toText(row?.overrides.vs ?? preset?.vs),
+    dueDay: toText(row?.overrides.dueDay ?? preset?.dueDay),
     status: row?.status ?? ("unpaid" as PaymentStatus),
     paidOn: toText(row?.paidOn),
-    note: toText(row?.note),
+    note: toText(row?.note ?? preset?.note),
   };
 }
 
@@ -99,7 +103,7 @@ export function OneOffDialog({
   onClose,
 }: OneOffDialogProps) {
   const [form, setForm] = useState(() => initialForm(row, preset));
-  const [recurring, setRecurring] = useState(false);
+  const [recurring, setRecurring] = useState(preset?.recurring ?? false);
   const [formError, setFormError] = useState<string | null>(null);
   const set = (field: keyof OneOffForm) => (value: string) =>
     setForm({ ...form, [field]: value });
@@ -119,7 +123,7 @@ export function OneOffDialog({
     <Dialog
       open
       onClose={onClose}
-      title={row ? "Jednorázová platba" : "Nová platba"}
+      title={row ? "Jednorázová platba" : (preset?.title ?? "Nová platba")}
       footer={
         <>
           {row && (

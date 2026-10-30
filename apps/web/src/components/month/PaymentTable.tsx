@@ -1,5 +1,5 @@
 import type { MonthRow, PaymentStatus } from "@kkff/api/contracts";
-import { ArrowDown, ArrowUp, Pencil, Plus, QrCode } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Pencil, Plus, QrCode } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DeleteButton } from "@/components/ui/delete-button";
@@ -58,6 +58,7 @@ interface RowActions extends RowEditing {
   onEdit: (row: MonthRow) => void;
   onQr: (row: MonthRow) => void;
   onDelete: (row: MonthRow) => void;
+  onDuplicate: (row: MonthRow) => void;
 }
 
 interface CategoryActions {
@@ -96,6 +97,23 @@ function RowDeleteButton({
       }
       onDelete={() => onDelete(row)}
     />
+  );
+}
+
+function DuplicateButton({
+  row,
+  onDuplicate,
+}: Pick<RowActions, "onDuplicate"> & { row: MonthRow }) {
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      title={`Duplikovat „${row.name}“`}
+      aria-label={`Duplikovat „${row.name}“`}
+      onClick={() => onDuplicate(row)}
+    >
+      <Copy className="size-5 md:size-4" />
+    </Button>
   );
 }
 
@@ -139,6 +157,7 @@ function PaymentRow({
   onEdit,
   onQr,
   onDelete,
+  onDuplicate,
   ...editing
 }: RowActions & { row: MonthRow }) {
   const isZero = row.amount === 0;
@@ -217,6 +236,7 @@ function PaymentRow({
       </td>
       <td className="py-2 pr-4 pl-2 text-right align-top whitespace-nowrap">
         <RowButtons row={row} onEdit={onEdit} onQr={onQr} />
+        <DuplicateButton row={row} onDuplicate={onDuplicate} />
         <RowDeleteButton row={row} onDelete={onDelete} />
       </td>
     </tr>
@@ -233,6 +253,7 @@ function PaymentCard({
   onEdit,
   onQr,
   onDelete,
+  onDuplicate,
   ...editing
 }: RowActions & { row: MonthRow }) {
   const isZero = row.amount === 0;
@@ -278,7 +299,7 @@ function PaymentCard({
             <AccountCell {...cell} accounts={editing.accounts} />
             <span
               className={cn(
-                "inline-flex items-baseline gap-1",
+                "inline-flex items-baseline gap-1 whitespace-nowrap",
                 overdue && "font-semibold text-rose-700",
               )}
             >
@@ -286,7 +307,7 @@ function PaymentCard({
               <DueCell {...cell} />
             </span>
             {row.paidOn && (
-              <span className="inline-flex items-baseline gap-1">
+              <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
                 · uhrazeno
                 <PaidOnCell {...cell} />
               </span>
@@ -301,8 +322,9 @@ function PaymentCard({
             <div className="text-[11px] text-amber-700">upraveno</div>
           )}
         </div>
-        {/* Koš nahoře, aby dole zůstalo místo pro přepínač stavu. */}
-        <div className="-mt-1 -mr-1 shrink-0">
+        {/* Kopie a koš nahoře, aby dole zůstalo místo pro přepínač stavu. */}
+        <div className="-mt-1 -mr-1 flex shrink-0">
+          <DuplicateButton row={row} onDuplicate={onDuplicate} />
           <RowDeleteButton row={row} onDelete={onDelete} />
         </div>
       </div>
