@@ -7,8 +7,9 @@ import {
   DragOverlay,
   type DragStartEvent,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   pointerWithin,
+  TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -18,6 +19,7 @@ import type { MonthRow } from "@kkff/api/contracts";
 import { GripVertical } from "lucide-react";
 import {
   createContext,
+  type KeyboardEventHandler,
   type ReactNode,
   useCallback,
   useContext,
@@ -45,6 +47,36 @@ export const categoryDndId = (category: string) => `cat:${category}`;
 
 const DropContext = createContext<DropTarget | null>(null);
 const DraggingContext = createContext<DragData | null>(null);
+
+/** Tažení nezačne z polí a výběrů – v nich se píše, označuje a vybírá. */
+function startsDrag(target: EventTarget | null): boolean {
+  return !(
+    target instanceof Element &&
+    target.closest("input, textarea, select, [contenteditable='true']")
+  );
+}
+
+// Myší jde řádek chytit kdekoli (kliknutí bez pohybu dál upravuje buňku),
+// prstem po krátkém podržení – rychlý posun prstem dál roluje stránkou.
+class RowMouseSensor extends MouseSensor {
+  static activators = [
+    {
+      eventName: "onMouseDown" as const,
+      handler: ({ nativeEvent }: { nativeEvent: MouseEvent }) =>
+        nativeEvent.button === 0 && startsDrag(nativeEvent.target),
+    },
+  ];
+}
+
+class RowTouchSensor extends TouchSensor {
+  static activators = [
+    {
+      eventName: "onTouchStart" as const,
+      handler: ({ nativeEvent }: { nativeEvent: TouchEvent }) =>
+        nativeEvent.touches.length === 1 && startsDrag(nativeEvent.target),
+    },
+  ];
+}
 
 // Při tažení kategorie se počítají jen záhlaví kategorií.
 const collision: CollisionDetection = (args) => {
@@ -79,7 +111,10 @@ export function MonthDnd({
   onDrop: (dragged: DragData, target: DropTarget) => void;
 }) {
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(RowMouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(RowTouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 8 },
+    }),
     useSensor(KeyboardSensor),
   );
   const [dragging, setDragging] = useState<DragData | null>(null);
@@ -151,9 +186,15 @@ export function useDndItem(
     [draggable.setNodeRef, droppable.setNodeRef],
   );
   const isTarget = target?.id === id;
+  // Myš a dotyk na celém prvku, klávesnice jen na úchytu (Enter/mezerník
+  // v poli uvnitř řádku nesmí spustit přetahování).
+  const { onKeyDown, ...pointerListeners } = draggable.listeners ?? {};
+  const onHandleKeyDown = onKeyDown as KeyboardEventHandler | undefined;
   return {
     setNodeRef,
-    handle: { ...draggable.attributes, ...draggable.listeners },
+    /** Na celý řádek/kartu/záhlaví. */
+    listeners: pointerListeners,
+    handle: { ...draggable.attributes, onKeyDown: onHandleKeyDown },
     isDragging: draggable.isDragging,
     /** Kam se puštěný prvek položí vzhledem k tomuto. */
     drop: !isTarget
@@ -166,7 +207,7 @@ export function useDndItem(
   };
 }
 
-/** Úchyt pro přetažení; jen tímto se táhne, takže na telefonu jde dál rolovat. */
+/** Úchyt pro přetažení (a pro klávesnici); táhnout jde i za celý řádek. */
 export function DragHandle({
   label,
   hidden,
@@ -186,7 +227,7 @@ export function DragHandle({
       title={label}
       {...handle}
       className={cn(
-        "flex shrink-0 cursor-grab touch-none items-center rounded text-slate-300 hover:bg-slate-100 hover:text-slate-500 focus-visible:outline-2 focus-visible:outline-brand-500 active:cursor-grabbing",
+        "flex shrink-0 cursor-grab items-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-2 focus-visible:outline-brand-500 active:cursor-grabbing",
         className,
       )}
     >

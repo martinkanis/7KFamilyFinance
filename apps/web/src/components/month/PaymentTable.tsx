@@ -151,6 +151,7 @@ function PaymentRow({
   return (
     <tr
       ref={dnd.setNodeRef}
+      {...dnd.listeners}
       className={cn(
         "group border-t border-slate-100",
         isZero ? "text-slate-400" : ROW_TINT[row.status],
@@ -243,8 +244,10 @@ function PaymentCard({
   return (
     <li
       ref={dnd.setNodeRef}
+      {...dnd.listeners}
       className={cn(
-        "group rounded-xl border border-l-4 border-slate-200 bg-white p-3 shadow-sm",
+        // Podržením prstu se karta táhne – ať se místo toho neoznačuje text.
+        "group rounded-xl border border-l-4 border-slate-200 bg-white p-3 shadow-sm select-none [-webkit-touch-callout:none]",
         isZero ? "border-l-slate-200 opacity-60" : CARD_EDGE[row.status],
         dnd.isDragging && "opacity-40",
         dnd.drop && DROP_LINE[dnd.drop],
@@ -350,7 +353,7 @@ function CategoryDelete({
   );
 }
 
-const EMPTY_HINT = "Prázdná kategorie – přetáhni sem platbu za úchyt ⋮⋮";
+const EMPTY_HINT = "Prázdná kategorie – přetáhni sem platbu";
 
 function CardGroup({ group, isEmpty, ...actions }: GroupProps) {
   const dnd = useCategoryDnd(group.category);
@@ -358,8 +361,9 @@ function CardGroup({ group, isEmpty, ...actions }: GroupProps) {
     <div className={cn("mb-4", dnd.isDragging && "opacity-40")}>
       <div
         ref={dnd.setNodeRef}
+        {...dnd.listeners}
         className={cn(
-          "mb-1.5 flex items-center justify-between gap-1 rounded-lg px-1 text-sm",
+          "mb-1.5 flex items-center justify-between gap-1 rounded-lg px-1 text-sm select-none [-webkit-touch-callout:none]",
           dnd.drop && DROP_LINE[dnd.drop],
         )}
       >
@@ -405,6 +409,7 @@ function TableGroup({ group, isEmpty, ...actions }: GroupProps) {
     <tbody className={cn(dnd.isDragging && "opacity-40")}>
       <tr
         ref={dnd.setNodeRef}
+        {...dnd.listeners}
         className={cn(
           "bg-brand-50 text-sm font-semibold text-brand-700",
           dnd.drop && DROP_LINE[dnd.drop],
