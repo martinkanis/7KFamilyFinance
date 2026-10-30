@@ -21,22 +21,30 @@ import {
 } from "@/lib/formValues";
 import { AccountOptions, CounterpartyOptions, StatusOptions } from "./options";
 
+/** Předvyplnění nové platby (např. „+“ u kategorie). */
+export interface PaymentPreset {
+  direction: Direction;
+  category: string;
+}
+
 interface OneOffDialogProps {
   row: MonthRow | null;
+  preset?: PaymentPreset;
   accounts: Account[];
   counterparties: Counterparty[];
   categories: string[];
   isSaving: boolean;
   error: unknown;
-  onSave: (input: OneOffInput) => void;
+  /** `recurring` = nová pravidelná platba od tohoto měsíce (jen u nové). */
+  onSave: (input: OneOffInput, recurring: boolean) => void;
   onDelete: (row: MonthRow) => void;
   onClose: () => void;
 }
 
-function initialForm(row: MonthRow | null) {
+function initialForm(row: MonthRow | null, preset?: PaymentPreset) {
   return {
-    direction: row?.direction ?? ("expense" as Direction),
-    category: row?.category ?? "",
+    direction: row?.direction ?? preset?.direction ?? ("expense" as Direction),
+    category: row?.category ?? preset?.category ?? "",
     name: row?.name ?? "",
     amount: toText(row?.amount),
     counterpartyId: toText(row?.counterparty?.id),
@@ -80,6 +88,7 @@ function toOneOffInput(form: OneOffForm): OneOffInput | string {
 
 export function OneOffDialog({
   row,
+  preset,
   accounts,
   counterparties,
   categories,
@@ -89,7 +98,8 @@ export function OneOffDialog({
   onDelete,
   onClose,
 }: OneOffDialogProps) {
-  const [form, setForm] = useState(() => initialForm(row));
+  const [form, setForm] = useState(() => initialForm(row, preset));
+  const [recurring, setRecurring] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const set = (field: keyof OneOffForm) => (value: string) =>
     setForm({ ...form, [field]: value });
@@ -102,14 +112,14 @@ export function OneOffDialog({
       setFormError(input);
       return;
     }
-    onSave(input);
+    onSave(input, row == null && recurring);
   };
 
   return (
     <Dialog
       open
       onClose={onClose}
-      title={row ? "Jednorázová platba" : "Nová jednorázová platba"}
+      title={row ? "Jednorázová platba" : "Nová platba"}
       footer={
         <>
           {row && (
@@ -139,6 +149,39 @@ export function OneOffDialog({
         onSubmit={submit}
         className="grid gap-4 sm:grid-cols-2"
       >
+        {row == null && (
+          <fieldset className="sm:col-span-2">
+            <legend className="text-sm font-medium text-slate-700">
+              Platba je
+            </legend>
+            <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="payment-kind"
+                  checked={!recurring}
+                  onChange={() => setRecurring(false)}
+                />
+                jednorázová – jen tento měsíc
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="payment-kind"
+                  checked={recurring}
+                  onChange={() => setRecurring(true)}
+                />
+                pravidelná – každý měsíc od tohoto
+              </label>
+            </div>
+            {recurring && (
+              <p className="mt-1 text-xs text-slate-500">
+                Založí se položka (najdeš ji v Položkách), měsíce splatnosti a
+                další údaje jdou upravit tam.
+              </p>
+            )}
+          </fieldset>
+        )}
         <Field label="Směr">
           <Select
             value={form.direction}

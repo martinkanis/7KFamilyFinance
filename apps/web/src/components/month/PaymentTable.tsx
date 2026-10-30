@@ -11,6 +11,7 @@ import {
   groupByCategory,
   isOverdue,
   isPayable,
+  OWN_ORDER,
   type RowSort,
   type SortBy,
   sortRows,
@@ -51,6 +52,8 @@ interface RowActions extends RowEditing {
   today: string;
   /** Platby jdou přetahovat jen ve vlastním pořadí (ne při řazení). */
   canDrag: boolean;
+  /** Vypne řazení, aby šlo platby přetahovat. */
+  onEnableDrag: () => void;
   onStatus: (row: MonthRow, status: PaymentStatus) => void;
   onEdit: (row: MonthRow) => void;
   onQr: (row: MonthRow) => void;
@@ -59,12 +62,13 @@ interface RowActions extends RowEditing {
 
 interface CategoryActions {
   onAddCategory: (name: string) => void;
+  onAddPayment: (category: string) => void;
   onDeleteCategory: (category: string, isEmpty: boolean) => void;
 }
 
 interface PaymentTableProps extends CategoryActions {
   title: string;
-  actions: Omit<RowActions, "canDrag">;
+  actions: Omit<RowActions, "canDrag" | "onEnableDrag">;
   /** Zobrazené (vyfiltrované) platby jednoho směru. */
   rows: MonthRow[];
   /** Všechny platby směru – podle nich se pozná prázdná kategorie. */
@@ -130,6 +134,7 @@ function PaymentRow({
   row,
   today,
   canDrag,
+  onEnableDrag,
   onStatus,
   onEdit,
   onQr,
@@ -163,11 +168,11 @@ function PaymentRow({
         <div className="flex items-start gap-1">
           <DragHandle
             label={`Přetáhnout „${row.name}“`}
-            hidden={!canDrag}
             handle={dnd.handle}
+            onEnable={canDrag ? undefined : onEnableDrag}
             className="mt-0.5"
           />
-          <div className={cn("min-w-0", !canDrag && "pl-3")}>
+          <div className="min-w-0">
             <NameCell
               row={row}
               overdue={overdue}
@@ -223,6 +228,7 @@ function PaymentCard({
   row,
   today,
   canDrag,
+  onEnableDrag,
   onStatus,
   onEdit,
   onQr,
@@ -256,8 +262,8 @@ function PaymentCard({
       <div className="flex items-start justify-between gap-2">
         <DragHandle
           label={`Přetáhnout „${row.name}“`}
-          hidden={!canDrag}
           handle={dnd.handle}
+          onEnable={canDrag ? undefined : onEnableDrag}
           className="-ml-1.5 p-1"
         />
         <div className="min-w-0 flex-1">
@@ -326,7 +332,7 @@ function remainingLabel(group: CategoryGroup): string {
 
 interface GroupProps
   extends RowActions,
-    Pick<CategoryActions, "onDeleteCategory"> {
+    Pick<CategoryActions, "onDeleteCategory" | "onAddPayment"> {
   group: CategoryGroup;
   isEmpty: boolean;
 }
@@ -340,20 +346,39 @@ function useCategoryDnd(category: string) {
   );
 }
 
-function CategoryDelete({
+/** Přidat platbu do kategorie a smazat kategorii. */
+function CategoryButtons({
   group,
   isEmpty,
   onDeleteCategory,
-}: Pick<GroupProps, "group" | "isEmpty" | "onDeleteCategory">) {
+  onAddPayment,
+}: Pick<
+  GroupProps,
+  "group" | "isEmpty" | "onDeleteCategory" | "onAddPayment"
+>) {
+  const addLabel = `Přidat platbu do „${group.category}“`;
   return (
-    <DeleteButton
-      label={`Smazat kategorii „${group.category}“`}
-      onDelete={() => onDeleteCategory(group.category, isEmpty)}
-    />
+    <span className="inline-flex shrink-0">
+      <Button
+        size="sm"
+        variant="ghost"
+        title={addLabel}
+        aria-label={addLabel}
+        onClick={() => onAddPayment(group.category)}
+        className="text-brand-700 hover:bg-brand-100"
+      >
+        <Plus className="size-5 md:size-4" />
+      </Button>
+      <DeleteButton
+        label={`Smazat kategorii „${group.category}“`}
+        onDelete={() => onDeleteCategory(group.category, isEmpty)}
+      />
+    </span>
   );
 }
 
-const EMPTY_HINT = "Prázdná kategorie – přetáhni sem platbu";
+const EMPTY_HINT =
+  "Prázdná kategorie – přetáhni sem platbu nebo ji přidej přes +";
 
 function CardGroup({ group, isEmpty, ...actions }: GroupProps) {
   const dnd = useCategoryDnd(group.category);
@@ -383,10 +408,11 @@ function CardGroup({ group, isEmpty, ...actions }: GroupProps) {
           {group.rows.length > 0 &&
             `${formatMoney(group.plan)} · ${remainingLabel(group)}`}
         </span>
-        <CategoryDelete
+        <CategoryButtons
           group={group}
           isEmpty={isEmpty}
           onDeleteCategory={actions.onDeleteCategory}
+          onAddPayment={actions.onAddPayment}
         />
       </div>
       <ul className="space-y-2">
@@ -435,10 +461,11 @@ function TableGroup({ group, isEmpty, ...actions }: GroupProps) {
           {remainingLabel(group)}
         </td>
         <td className="py-1 pr-4 pl-2 text-right">
-          <CategoryDelete
+          <CategoryButtons
             group={group}
             isEmpty={isEmpty}
             onDeleteCategory={actions.onDeleteCategory}
+            onAddPayment={actions.onAddPayment}
           />
         </td>
       </tr>
@@ -492,6 +519,13 @@ function AddCategory({ onAdd }: { onAdd: (name: string) => void }) {
     </form>
   );
 }
+
+const SORT_LABELS: Record<SortBy, string> = {
+  own: "",
+  due: "podle splatnosti",
+  amount: "podle částky",
+  status: "podle stavu",
+};
 
 const SORT_COLUMNS: { by: SortBy; label: string; align?: "right" }[] = [
   { by: "due", label: "Splatnost" },
@@ -562,6 +596,7 @@ function Cards(props: ViewProps) {
           isEmpty={isEmpty}
           {...actions}
           onDeleteCategory={props.onDeleteCategory}
+          onAddPayment={props.onAddPayment}
         />
       ))}
     </section>
@@ -609,6 +644,7 @@ function Table(props: ViewProps) {
             isEmpty={isEmpty}
             {...actions}
             onDeleteCategory={props.onDeleteCategory}
+            onAddPayment={props.onAddPayment}
           />
         ))}
         {groups.length === 0 && (
@@ -630,10 +666,25 @@ export function PaymentTable(props: PaymentTableProps) {
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const view: ViewProps = {
     ...props,
-    actions: { ...props.actions, canDrag: props.sort.by === "own" },
+    actions: {
+      ...props.actions,
+      canDrag: props.sort.by === "own",
+      onEnableDrag: () => props.onSortChange(OWN_ORDER),
+    },
   };
   return (
     <div className="space-y-2">
+      {props.sort.by !== "own" && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <span>
+            Platby jsou v kategoriích seřazené {SORT_LABELS[props.sort.by]} –
+            přetahovat je jde jen ve vlastním pořadí.
+          </span>
+          <Button size="sm" onClick={() => props.onSortChange(OWN_ORDER)}>
+            Vlastní pořadí
+          </Button>
+        </div>
+      )}
       {isDesktop ? <Table {...view} /> : <Cards {...view} />}
       <AddCategory onAdd={props.onAddCategory} />
     </div>

@@ -19,7 +19,12 @@ import {
   type PlannerCatalog,
   summarizeMonth,
 } from "./planner.ts";
-import { endingFrom, isItemDueInMonth, parseDueMonths } from "./schedule.ts";
+import {
+  endingFrom,
+  isItemDueInMonth,
+  nextItemCode,
+  parseDueMonths,
+} from "./schedule.ts";
 import {
   makeAccount,
   makeCounterparty,
@@ -205,6 +210,14 @@ describe("změny položky od měsíce", () => {
     expect(changedValues(item, { ...item, amount: 3500, vs: "111" })).toEqual({
       amount: 3500,
     });
+  });
+});
+
+describe("ID nové položky", () => {
+  it("navazuje na nejvyšší číslo ve směru", () => {
+    expect(nextItemCode("expense", ["V01", "V57", "P03", "X9"])).toBe("V58");
+    expect(nextItemCode("income", ["V01", "P03"])).toBe("P04");
+    expect(nextItemCode("income", [])).toBe("P01");
   });
 });
 

@@ -210,16 +210,34 @@ export function useDndItem(
 /** Úchyt pro přetažení (a pro klávesnici); táhnout jde i za celý řádek. */
 export function DragHandle({
   label,
-  hidden,
   handle,
   className,
+  onEnable,
 }: {
   label: string;
-  hidden?: boolean;
   handle: ReturnType<typeof useDndItem>["handle"];
   className?: string;
+  /** Přetahování je vypnuté (seřazený seznam) – klik ho zapne. */
+  onEnable?: () => void;
 }) {
-  if (hidden) return null;
+  if (onEnable) {
+    const hint =
+      "Seřazeno – klikni pro vlastní pořadí, pak jde platba přetáhnout";
+    return (
+      <button
+        type="button"
+        aria-label={hint}
+        title={hint}
+        onClick={onEnable}
+        className={cn(
+          "flex shrink-0 cursor-pointer items-center rounded text-slate-300 hover:bg-slate-100 hover:text-slate-500 focus-visible:outline-2 focus-visible:outline-brand-500",
+          className,
+        )}
+      >
+        <GripVertical className="size-5 md:size-4" />
+      </button>
+    );
+  }
   return (
     <button
       type="button"

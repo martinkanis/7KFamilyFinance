@@ -13,6 +13,7 @@ import {
 import { reorderRows } from "../categories/service.ts";
 import {
   createOneOff,
+  createRecurringItem,
   deleteOneOff,
   endItemFrom,
   getMonthView,
@@ -87,6 +88,14 @@ export const monthRoutes = new Elysia({ prefix: "/api/months/:month" })
       return getMonthView(params.month);
     },
     { params: monthItemParams },
+  )
+  .post(
+    "/items",
+    async ({ params, body }): Promise<MonthView> => {
+      await createRecurringItem(params.month, body);
+      return getMonthView(params.month);
+    },
+    { params: monthParams, body: oneOffBody },
   )
   .post(
     "/one-offs",

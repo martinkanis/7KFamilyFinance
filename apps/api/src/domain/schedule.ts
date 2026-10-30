@@ -63,3 +63,22 @@ export function endingFrom(
     item.validTo && item.validTo < lastValid ? item.validTo : lastValid;
   return { kind: "end", validTo };
 }
+
+const CODE_PREFIX = { expense: "V", income: "P" } as const;
+
+/** Další volné ID položky: „V“ u výdajů, „P“ u příjmů, číslo o jedna vyšší než nejvyšší. */
+export function nextItemCode(
+  direction: keyof typeof CODE_PREFIX,
+  existingCodes: string[],
+): string {
+  const prefix = CODE_PREFIX[direction];
+  const pattern = new RegExp(`^${prefix}(\\d+)$`);
+  const highest = existingCodes.reduce((max, code) => {
+    const match = pattern.exec(code);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  let next = highest + 1;
+  const taken = new Set(existingCodes);
+  while (taken.has(`${prefix}${String(next).padStart(2, "0")}`)) next++;
+  return `${prefix}${String(next).padStart(2, "0")}`;
+}

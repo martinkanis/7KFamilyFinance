@@ -33,7 +33,10 @@ import {
   MonthToolbar,
   NO_ACCOUNT,
 } from "@/components/month/MonthToolbar";
-import { OneOffDialog } from "@/components/month/OneOffDialog";
+import {
+  OneOffDialog,
+  type PaymentPreset,
+} from "@/components/month/OneOffDialog";
 import { PaymentTable } from "@/components/month/PaymentTable";
 import { QrPayDialog } from "@/components/month/QrPayDialog";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -106,7 +109,7 @@ const MONTH_SAVE_KEY = "month-save";
 
 type Editing =
   | { kind: "entry"; row: MonthRow }
-  | { kind: "oneOff"; row: MonthRow | null }
+  | { kind: "oneOff"; row: MonthRow | null; preset?: PaymentPreset }
   | null;
 
 function matchesFilters(row: MonthRow, filters: Filters): boolean {
@@ -474,10 +477,17 @@ export function MonthPage() {
         { onSuccess: closeEditing },
       );
 
-  const onSaveOneOff = (row: MonthRow | null) => (input: OneOffInput) =>
-    save.mutate(() => saveOneOff(month, row, input), {
-      onSuccess: closeEditing,
-    });
+  const onSaveOneOff =
+    (row: MonthRow | null) => (input: OneOffInput, recurring: boolean) =>
+      save.mutate(
+        async () => {
+          if (!recurring) return saveOneOff(month, row, input);
+          const updated = await api.createRecurring(month, input);
+          refreshOtherMonths();
+          return updated;
+        },
+        { onSuccess: closeEditing },
+      );
 
   const deleteRow = (row: MonthRow) => {
     if (!window.confirm(deleteQuestion(month, row))) return;
@@ -645,6 +655,13 @@ export function MonthPage() {
               sort={sort}
               onSortChange={setSort}
               onAddCategory={addCategory}
+              onAddPayment={(category) =>
+                setEditing({
+                  kind: "oneOff",
+                  row: null,
+                  preset: { direction, category },
+                })
+              }
               onDeleteCategory={deleteCategory}
             />
           </MonthDnd>
@@ -673,6 +690,7 @@ export function MonthPage() {
       {editing?.kind === "oneOff" && (
         <OneOffDialog
           row={editing.row}
+          preset={editing.preset}
           accounts={accounts.data ?? []}
           counterparties={counterparties.data ?? []}
           categories={categories}

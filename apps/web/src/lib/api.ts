@@ -120,6 +120,9 @@ export const api = {
   /** Pravidelná položka od tohoto měsíce končí (minulé měsíce zůstanou). */
   endItem: (month: string, itemId: number) =>
     request<MonthView>("DELETE", `/api/months/${month}/items/${itemId}`),
+  /** Nová pravidelná platba (položka) platná od tohoto měsíce. */
+  createRecurring: (month: string, input: OneOffInput) =>
+    request<MonthView>("POST", `/api/months/${month}/items`, input),
   createOneOff: (month: string, input: OneOffInput) =>
     request<MonthView>("POST", `/api/months/${month}/one-offs`, input),
   updateOneOff: (month: string, id: number, input: OneOffInput) =>

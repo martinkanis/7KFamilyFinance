@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import type {
   EntryInput,
   ItemEntryInput,
@@ -9,6 +9,7 @@ import type {
 import { db } from "../../db/index.ts";
 import { items, monthEntries, monthSettings } from "../../db/schema.ts";
 import type { ChangeValues } from "../../domain/itemChanges.ts";
+import { firstDayOf } from "../../domain/month.ts";
 import {
   breakdownByAccount,
   buildMonthRows,
@@ -16,7 +17,7 @@ import {
   monthCategories,
   summarizeMonth,
 } from "../../domain/planner.ts";
-import { endingFrom } from "../../domain/schedule.ts";
+import { endingFrom, nextItemCode } from "../../domain/schedule.ts";
 import { notFound, withDbErrors } from "../../lib/errors.ts";
 import { firstOrThrow, normalizeTexts } from "../../lib/normalize.ts";
 import { todayInPrague } from "../../lib/today.ts";
@@ -147,6 +148,55 @@ export async function deleteOneOff(month: string, id: number): Promise<void> {
     .where(oneOffOf(month, id))
     .returning({ id: monthEntries.id });
   firstOrThrow(rows, () => notFound(ONE_OFF));
+}
+
+/**
+ * Nová pravidelná platba přímo z měsíce: položka platná od tohoto měsíce
+ * s dalším volným ID, na konci své kategorie. Stav a poznámka patří měsíci.
+ */
+export async function createRecurringItem(
+  month: string,
+  input: OneOffInput,
+): Promise<void> {
+  const values = entryValues(input);
+  await db.transaction(async (tx) => {
+    const codes = await tx.select({ code: items.code }).from(items);
+    const [max] = await tx
+      .select({ value: sql<number>`coalesce(max(${items.sortOrder}), 0)` })
+      .from(items);
+    const rows = await withDbErrors(ITEM, () =>
+      tx
+        .insert(items)
+        .values({
+          code: nextItemCode(
+            values.direction,
+            codes.map((row) => row.code),
+          ),
+          direction: values.direction,
+          category: values.category,
+          name: values.name,
+          amount: values.amount,
+          dueDay: values.dueDay,
+          validFrom: firstDayOf(month),
+          ourAccountId: values.ourAccountId,
+          counterpartyId: values.counterpartyId,
+          counterpartyAccount: values.counterpartyAccount,
+          vs: values.vs,
+          sortOrder: Number(max?.value ?? 0) + 1,
+        })
+        .returning({ id: items.id }),
+    );
+    const item = firstOrThrow(rows, () => notFound(ITEM));
+    if (values.status !== "unpaid" || values.note != null) {
+      await tx.insert(monthEntries).values({
+        month,
+        itemId: item.id,
+        status: values.status,
+        paidOn: values.paidOn,
+        note: values.note,
+      });
+    }
+  });
 }
 
 /** Pravidelná položka od tohoto měsíce končí; záznamy od měsíce dál se smažou. */
