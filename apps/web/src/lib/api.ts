@@ -3,6 +3,9 @@ import type {
   AccountBalance,
   ApiErrorBody,
   BalanceInput,
+  CategoryDelete,
+  CategoryOrder,
+  CategoryRef,
   CategoryRename,
   CategoryRenameResult,
   Counterparty,
@@ -19,6 +22,7 @@ import type {
   MonthView,
   OneOffInput,
   Overview,
+  RowOrder,
   Settings,
   Template,
 } from "@kkff/api/contracts";
@@ -99,6 +103,14 @@ export const api = {
       "DELETE",
       `/api/items/${itemId}/changes/${changeId}`,
     ),
+  addCategory: (category: CategoryRef) =>
+    request<{ ok: boolean }>("POST", "/api/categories", category),
+  orderCategories: (order: CategoryOrder) =>
+    request<{ ok: boolean }>("PUT", "/api/categories/order", order),
+  deleteCategory: (input: CategoryDelete) =>
+    request<{ ok: boolean }>("POST", "/api/categories/delete", input),
+  reorderRows: (month: string, order: RowOrder) =>
+    request<MonthView>("PUT", `/api/months/${month}/order`, order),
   renameCategory: (rename: CategoryRename) =>
     request<CategoryRenameResult>("POST", "/api/items/rename-category", rename),
 

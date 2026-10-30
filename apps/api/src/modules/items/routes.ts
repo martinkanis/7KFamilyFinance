@@ -31,6 +31,7 @@ import {
   requiredText,
 } from "../../lib/schemas.ts";
 import { todayInPrague } from "../../lib/today.ts";
+import { renameStoredCategory } from "../categories/service.ts";
 import {
   deleteItemChange,
   loadItemsWithChanges,
@@ -125,6 +126,7 @@ function renameCategory({
         ),
       )
       .returning({ id: monthEntries.id });
+    await renameStoredCategory(tx, direction, source, target);
     return { items: renamedItems.length, oneOffs: renamedOneOffs.length };
   });
 }

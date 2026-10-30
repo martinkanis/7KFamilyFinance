@@ -1,6 +1,7 @@
 import type {
   Account,
   AccountBreakdownRow,
+  CategoryRef,
   Counterparty,
   Direction,
   DirectionSummary,
@@ -32,6 +33,13 @@ export interface MonthEntryRecord {
   direction: Direction | null;
   category: string | null;
   counterpartyId: number | null;
+  afterItemId: number | null;
+  sortOrder: number | null;
+}
+
+/** Uložené pořadí kategorie (tabulka categories). */
+export interface CategoryRecord extends CategoryRef {
+  sortOrder: number;
 }
 
 export interface PlannerCatalog {
@@ -41,6 +49,7 @@ export interface PlannerCatalog {
   accounts: Account[];
   /** Změny položek od měsíce dál. */
   itemChanges: ItemChange[];
+  categories: CategoryRecord[];
   insuranceReserve: number;
 }
 
@@ -68,13 +77,25 @@ function indexById<T extends { id: number }>(rows: T[]): Map<number, T> {
   return new Map(rows.map((row) => [row.id, row]));
 }
 
-function rankCategories(items: Item[]): Map<string, number> {
+export const categoryKey = (direction: Direction, name: string) =>
+  `${direction}|${name}`;
+
+/** Pořadí kategorií: nejdřív uložené (přetažené), pak další podle pořadí položek. */
+function rankCategories(catalog: PlannerCatalog): Map<string, number> {
   const rank = new Map<string, number>();
-  const sorted = [...items].sort((a, b) => a.sortOrder - b.sortOrder);
-  for (const item of sorted) {
-    if (!rank.has(item.category)) {
-      rank.set(item.category, rank.size);
-    }
+  const add = (direction: Direction, name: string) => {
+    const key = categoryKey(direction, name);
+    if (!rank.has(key)) rank.set(key, rank.size);
+  };
+  for (const category of [...catalog.categories].sort(
+    (a, b) => a.sortOrder - b.sortOrder,
+  )) {
+    add(category.direction, category.name);
+  }
+  for (const item of [...catalog.items].sort(
+    (a, b) => a.sortOrder - b.sortOrder,
+  )) {
+    add(item.direction, item.category);
   }
   return rank;
 }
@@ -86,7 +107,7 @@ export function indexCatalog(catalog: PlannerCatalog): CatalogIndex {
     counterparties: indexById(catalog.counterparties),
     accounts: indexById(catalog.accounts),
     changesByItem: groupChangesByItem(catalog.itemChanges),
-    categoryRank: rankCategories(catalog.items),
+    categoryRank: rankCategories(catalog),
   };
 }
 
@@ -231,21 +252,99 @@ function buildOneOffRow(
   };
 }
 
-function compareRows(index: CatalogIndex) {
+type PositionKey = [number, number, number];
+
+/**
+ * Pozice v kategorii: položky podle pořadí, jednorázová platba hned za
+ * položkou, za kterou ji někdo přetáhl (nepřesunuté jsou na konci).
+ */
+function positionOf(
+  row: MonthRow,
+  entry: MonthEntryRecord | undefined,
+  sortOrderOf: Map<number, number>,
+): PositionKey {
+  if (!row.isOneOff) {
+    return [sortOrderOf.get(row.itemId ?? -1) ?? 0, 0, 0];
+  }
+  if (entry?.sortOrder == null) {
+    return [Number.POSITIVE_INFINITY, 1, row.entryId ?? 0];
+  }
+  const anchor =
+    entry.afterItemId == null
+      ? Number.NEGATIVE_INFINITY
+      : (sortOrderOf.get(entry.afterItemId) ?? Number.NEGATIVE_INFINITY);
+  return [anchor, 1, entry.sortOrder];
+}
+
+function compareKeys(a: PositionKey, b: PositionKey): number {
+  for (let i = 0; i < a.length; i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0 && !Number.isNaN(diff)) return diff;
+  }
+  return 0;
+}
+
+function sortRows(
+  rows: MonthRow[],
+  entries: MonthEntryRecord[],
+  index: CatalogIndex,
+): MonthRow[] {
   const unknownRank = Number.MAX_SAFE_INTEGER;
   const sortOrderOf = new Map(
     index.catalog.items.map((item) => [item.id, item.sortOrder]),
   );
-  return (a: MonthRow, b: MonthRow): number =>
-    DIRECTION_ORDER.indexOf(a.direction) -
-      DIRECTION_ORDER.indexOf(b.direction) ||
-    (index.categoryRank.get(a.category) ?? unknownRank) -
-      (index.categoryRank.get(b.category) ?? unknownRank) ||
-    a.category.localeCompare(b.category, "cs", { numeric: true }) ||
-    Number(a.isOneOff) - Number(b.isOneOff) ||
-    (sortOrderOf.get(a.itemId ?? -1) ?? 0) -
-      (sortOrderOf.get(b.itemId ?? -1) ?? 0) ||
-    (a.entryId ?? 0) - (b.entryId ?? 0);
+  const entryById = new Map(entries.map((entry) => [entry.id, entry]));
+  const rankOf = (row: MonthRow) =>
+    index.categoryRank.get(categoryKey(row.direction, row.category)) ??
+    unknownRank;
+  const keyed = rows.map((row) => ({
+    row,
+    rank: rankOf(row),
+    position: positionOf(
+      row,
+      row.isOneOff ? entryById.get(row.entryId ?? -1) : undefined,
+      sortOrderOf,
+    ),
+  }));
+  keyed.sort(
+    (a, b) =>
+      DIRECTION_ORDER.indexOf(a.row.direction) -
+        DIRECTION_ORDER.indexOf(b.row.direction) ||
+      a.rank - b.rank ||
+      a.row.category.localeCompare(b.row.category, "cs", { numeric: true }) ||
+      compareKeys(a.position, b.position) ||
+      (a.row.entryId ?? 0) - (b.row.entryId ?? 0),
+  );
+  return keyed.map(({ row }) => row);
+}
+
+/** Kategorie měsíce v pořadí: uložené (i prázdné), z položek a z plateb měsíce. */
+export function monthCategories(
+  index: CatalogIndex,
+  rows: MonthRow[],
+): CategoryRef[] {
+  const seen = new Map<string, CategoryRef>();
+  const add = (direction: Direction, name: string) => {
+    const key = categoryKey(direction, name);
+    if (!seen.has(key)) seen.set(key, { direction, name });
+  };
+  for (const category of index.catalog.categories) {
+    add(category.direction, category.name);
+  }
+  for (const item of index.catalog.items.filter((item) => item.active)) {
+    add(item.direction, item.category);
+  }
+  for (const row of rows) add(row.direction, row.category);
+  const rankOf = (c: CategoryRef) =>
+    index.categoryRank.get(categoryKey(c.direction, c.name)) ??
+    Number.MAX_SAFE_INTEGER;
+  return [...seen.values()].sort(
+    (a, b) =>
+      DIRECTION_ORDER.indexOf(a.direction) -
+        DIRECTION_ORDER.indexOf(b.direction) ||
+      rankOf(a) - rankOf(b) ||
+      a.name.localeCompare(b.name, "cs", { numeric: true }),
+  );
 }
 
 /** Řádky měsíce: aktivní položky (i nesplatné, s částkou 0), položky se záznamem a jednorázové platby. */
@@ -272,7 +371,7 @@ export function buildMonthRows(
   const oneOffRows = entries
     .filter((entry) => entry.itemId == null)
     .map((entry) => buildOneOffRow(month, entry, index));
-  return [...itemRows, ...oneOffRows].sort(compareRows(index));
+  return sortRows([...itemRows, ...oneOffRows], entries, index);
 }
 
 function sumAmounts(rows: MonthRow[]): number {

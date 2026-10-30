@@ -15,6 +15,7 @@ import {
   buildMonthRows,
   indexCatalog,
   type MonthEntryRecord,
+  monthCategories,
   type PlannerCatalog,
   roundMoney,
   summarizeMonth,
@@ -147,6 +148,7 @@ export async function computePlanSnapshot(): Promise<PlanSnapshot> {
       month,
       rows: rowsByMonth[i] ?? [],
       catalog,
+      index,
       correction: {
         amount: correctionOf.get(month) ?? 0,
         note: correctionNoteOf.get(month) ?? null,
@@ -160,11 +162,13 @@ function toMonthView(input: {
   month: string;
   rows: MonthRow[];
   catalog: PlannerCatalog;
+  index: ReturnType<typeof indexCatalog>;
   correction: MonthView["correction"];
 }): MonthView {
   return {
     month: input.month,
     rows: input.rows,
+    categories: monthCategories(input.index, input.rows),
     summary: summarizeMonth(input.rows),
     accounts: breakdownByAccount(input.rows, input.catalog.accounts),
     correction: input.correction,

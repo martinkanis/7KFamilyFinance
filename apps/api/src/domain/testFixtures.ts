@@ -102,6 +102,8 @@ export function makeEntry(
     direction: null,
     category: null,
     counterpartyId: null,
+    afterItemId: null,
+    sortOrder: null,
     ...overrides,
   };
 }

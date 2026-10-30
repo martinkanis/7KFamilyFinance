@@ -14,6 +14,8 @@ import {
   buildMonthRows,
   indexCatalog,
   insuranceReserveOf,
+  type MonthEntryRecord,
+  monthCategories,
   type PlannerCatalog,
   summarizeMonth,
 } from "./planner.ts";
@@ -34,6 +36,7 @@ function catalog(overrides: Partial<PlannerCatalog> = {}): PlannerCatalog {
     counterparties: [],
     accounts: [],
     itemChanges: [],
+    categories: [],
     insuranceReserve: 0,
     ...overrides,
   };
@@ -91,6 +94,63 @@ describe("splatnost položky", () => {
     expect(isItemDueInMonth(makeItem({ active: false }), "2026-11")).toBe(
       false,
     );
+  });
+});
+
+describe("pořadí kategorií a plateb", () => {
+  const items = [
+    makeItem({ id: 1, code: "V01", category: "Bydlení", sortOrder: 1 }),
+    makeItem({ id: 2, code: "V02", category: "Bydlení", sortOrder: 2 }),
+    makeItem({ id: 3, code: "V03", category: "Auto", sortOrder: 3 }),
+  ];
+  const oneOff = (id: number, values: Partial<MonthEntryRecord>) =>
+    makeEntry({
+      id,
+      itemId: null,
+      name: `J${id}`,
+      direction: "expense",
+      category: "Bydlení",
+      amount: 100,
+      ...values,
+    });
+
+  it("uložené pořadí kategorií má přednost, prázdné kategorie se ukážou", () => {
+    const index = indexCatalog(
+      catalog({
+        items,
+        categories: [
+          { direction: "expense", name: "Auto", sortOrder: 1 },
+          { direction: "expense", name: "Prázdná", sortOrder: 2 },
+        ],
+      }),
+    );
+    const rows = buildMonthRows("2026-11", index, []);
+    expect([...new Set(rows.map((r) => r.category))]).toEqual([
+      "Auto",
+      "Bydlení",
+    ]);
+    expect(monthCategories(index, rows).map((c) => c.name)).toEqual([
+      "Auto",
+      "Prázdná",
+      "Bydlení",
+    ]);
+  });
+
+  it("jednorázová platba stojí za položkou, za kterou ji přetáhli", () => {
+    const index = indexCatalog(catalog({ items }));
+    const rows = buildMonthRows("2026-11", index, [
+      oneOff(10, {}),
+      oneOff(11, { afterItemId: 1, sortOrder: 1 }),
+      oneOff(12, { afterItemId: null, sortOrder: 0 }),
+    ]);
+    expect(rows.map((r) => r.name)).toEqual([
+      "J12",
+      "Nájem",
+      "J11",
+      "Nájem",
+      "J10",
+      "Nájem",
+    ]);
   });
 });
 

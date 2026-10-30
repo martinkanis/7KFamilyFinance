@@ -92,8 +92,17 @@ export interface CategoryGroup {
   remaining: number;
 }
 
-export function groupByCategory(rows: MonthRow[]): CategoryGroup[] {
-  const groups: CategoryGroup[] = [];
+/** Skupiny podle kategorií; `categories` dá pořadí a přidá i prázdné kategorie. */
+export function groupByCategory(
+  rows: MonthRow[],
+  categories: string[] = [],
+): CategoryGroup[] {
+  const groups: CategoryGroup[] = categories.map((category) => ({
+    category,
+    rows: [],
+    plan: 0,
+    remaining: 0,
+  }));
   for (const row of rows) {
     let group = groups.find((candidate) => candidate.category === row.category);
     if (!group) {
@@ -204,4 +213,109 @@ export function changedFieldsOf(
   changes: Partial<EntryInput>,
 ): ChangeableField[] {
   return CHANGEABLE_FIELDS.filter((field) => changes[field] != null);
+}
+
+export type SortBy = "own" | "due" | "amount" | "status";
+
+export interface RowSort {
+  by: SortBy;
+  desc: boolean;
+}
+
+export const OWN_ORDER: RowSort = { by: "own", desc: false };
+
+const STATUS_ORDER: Record<PaymentStatus, number> = {
+  unpaid: 0,
+  processing: 1,
+  paid: 2,
+};
+
+/** Řazení uvnitř kategorie; prázdná splatnost je vždy na konci. */
+export function sortRows(rows: MonthRow[], sort: RowSort): MonthRow[] {
+  if (sort.by === "own") return rows;
+  const sign = sort.desc ? -1 : 1;
+  const compare = (a: MonthRow, b: MonthRow): number => {
+    switch (sort.by) {
+      case "due":
+        if (a.dueDate == null || b.dueDate == null) {
+          return Number(a.dueDate == null) - Number(b.dueDate == null);
+        }
+        return sign * a.dueDate.localeCompare(b.dueDate);
+      case "amount":
+        return sign * (a.amount - b.amount);
+      default:
+        return sign * (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
+    }
+  };
+  return [...rows].sort(compare);
+}
+
+export interface RowTarget {
+  category: string;
+  /** Řádek, vedle kterého se platba položí; null = na začátek kategorie. */
+  anchorKey: string | null;
+  after: boolean;
+}
+
+export interface RowRef {
+  kind: "item" | "oneOff";
+  id: number;
+}
+
+function refOf(row: MonthRow): RowRef | null {
+  if (row.isOneOff) {
+    return row.entryId == null ? null : { kind: "oneOff", id: row.entryId };
+  }
+  return row.itemId == null ? null : { kind: "item", id: row.itemId };
+}
+
+/**
+ * Přesun platby po přetažení: nové řádky měsíce (pro okamžité zobrazení)
+ * a pořadí plateb cílové kategorie (pro server).
+ */
+export function moveRow(
+  rows: MonthRow[],
+  rowKey: string,
+  target: RowTarget,
+): { rows: MonthRow[]; categoryRows: RowRef[] } | null {
+  const dragged = rows.find((row) => row.key === rowKey);
+  if (!dragged || dragged.key === target.anchorKey) return null;
+  const moved = { ...dragged, category: target.category };
+  const rest = rows.filter((row) => row.key !== rowKey);
+  const inTarget = (row: MonthRow) =>
+    row.direction === moved.direction && row.category === target.category;
+  const categoryRows = rest.filter(inTarget);
+  const anchorIndex = categoryRows.findIndex(
+    (row) => row.key === target.anchorKey,
+  );
+  const insertAt = anchorIndex < 0 ? 0 : anchorIndex + (target.after ? 1 : 0);
+  categoryRows.splice(insertAt, 0, moved);
+  const firstIndex = rest.findIndex(inTarget);
+  const others = rest.filter((row) => !inTarget(row));
+  const blockAt = firstIndex < 0 ? others.length : firstIndex;
+  return {
+    rows: [
+      ...others.slice(0, blockAt),
+      ...categoryRows,
+      ...others.slice(blockAt),
+    ],
+    categoryRows: categoryRows
+      .map(refOf)
+      .filter((ref): ref is RowRef => ref != null),
+  };
+}
+
+/** Nové pořadí kategorií po přetažení `dragged` před/za `target`. */
+export function moveCategory(
+  names: string[],
+  dragged: string,
+  target: string,
+  after: boolean,
+): string[] | null {
+  if (dragged === target) return null;
+  const rest = names.filter((name) => name !== dragged);
+  const index = rest.indexOf(target);
+  if (index < 0) return null;
+  rest.splice(index + (after ? 1 : 0), 0, dragged);
+  return rest;
 }

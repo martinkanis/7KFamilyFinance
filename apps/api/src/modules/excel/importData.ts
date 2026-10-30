@@ -3,6 +3,7 @@ import { db, type Transaction } from "../../db/index.ts";
 import {
   accountBalances,
   accounts,
+  categories,
   counterparties,
   insurancePolicies,
   itemChanges,
@@ -48,6 +49,7 @@ async function deleteAll(tx: Transaction): Promise<void> {
   await tx.delete(monthEntries);
   await tx.delete(monthSettings);
   await tx.delete(itemChanges);
+  await tx.delete(categories);
   await tx.delete(items);
   await tx.delete(templates);
   await tx.delete(insurancePolicies);

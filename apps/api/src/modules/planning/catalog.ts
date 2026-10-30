@@ -3,6 +3,7 @@ import type { MonthCorrection } from "../../contracts.ts";
 import { db, type Executor } from "../../db/index.ts";
 import {
   accounts,
+  categories,
   counterparties,
   insurancePolicies,
   itemChanges,
@@ -28,6 +29,7 @@ export async function loadPlannerCatalog(
     accountRows,
     policies,
     changeRows,
+    categoryRows,
   ] = await Promise.all([
     executor.select().from(items).orderBy(asc(items.sortOrder)),
     executor.select().from(templates).orderBy(asc(templates.code)),
@@ -38,6 +40,7 @@ export async function loadPlannerCatalog(
       .from(insurancePolicies)
       .orderBy(asc(insurancePolicies.id)),
     executor.select().from(itemChanges),
+    executor.select().from(categories).orderBy(asc(categories.sortOrder)),
   ]);
   return {
     items: itemRows,
@@ -45,6 +48,7 @@ export async function loadPlannerCatalog(
     counterparties: counterpartyRows,
     accounts: accountRows,
     itemChanges: changeRows,
+    categories: categoryRows,
     insuranceReserve: insuranceReserveOf(
       policies.map((policy) => policy.annualAmount),
     ),

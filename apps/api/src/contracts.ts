@@ -252,9 +252,32 @@ export interface MonthCorrection {
   note: string | null;
 }
 
+export interface CategoryRef {
+  direction: Direction;
+  name: string;
+}
+
+/** Nová pozice plateb v kategorii (přetažení); přesunuté platby změní kategorii. */
+export interface RowOrder extends CategoryRef {
+  rows: { kind: "item" | "oneOff"; id: number }[];
+}
+
+/** Pořadí kategorií jednoho směru (přetažení). */
+export interface CategoryOrder {
+  direction: Direction;
+  names: string[];
+}
+
+/** Smazání kategorie; platby z ní se přesunou do `moveTo` (u prázdné null). */
+export interface CategoryDelete extends CategoryRef {
+  moveTo: string | null;
+}
+
 export interface MonthView {
   month: string;
   rows: MonthRow[];
+  /** Všechny kategorie v pořadí, i prázdné (do nich jde platbu přetáhnout). */
+  categories: CategoryRef[];
   summary: MonthSummary;
   accounts: AccountBreakdownRow[];
   correction: MonthCorrection;

@@ -13,6 +13,7 @@ import { Link, Navigate, useParams } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { AccountBreakdown } from "@/components/month/AccountBreakdown";
+import { DeleteCategoryDialog } from "@/components/month/DeleteCategoryDialog";
 import {
   DIRECTION_PANEL_ID,
   DirectionTabs,
@@ -21,6 +22,11 @@ import {
 import { EmptyMonth } from "@/components/month/EmptyMonth";
 import { EntryDialog } from "@/components/month/EntryDialog";
 import { ForwardOffer } from "@/components/month/ForwardOffer";
+import {
+  type DragData,
+  type DropTarget,
+  MonthDnd,
+} from "@/components/month/MonthDnd";
 import { MonthOverview } from "@/components/month/MonthOverview";
 import {
   type Filters,
@@ -48,8 +54,13 @@ import {
   entryInputOf,
   isPayable,
   itemEntryWithStatus,
+  moveCategory,
+  moveRow,
+  OWN_ORDER,
   oneOffInputOf,
   oneOffWithStatus,
+  type RowSort,
+  type RowTarget,
   rowWithChanges,
   withCategoryRenamed,
   withOptimisticStatus,
@@ -57,6 +68,40 @@ import {
 } from "@/lib/monthRows";
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+const SORT_STORAGE_KEY = "month-sort";
+const SORT_KEYS = ["own", "due", "amount", "status"];
+
+/** Řazení v kategoriích si prohlížeč pamatuje; bez úložiště vlastní pořadí. */
+function loadSort(): RowSort {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SORT_STORAGE_KEY) ?? "");
+    if (SORT_KEYS.includes(stored?.by)) {
+      return { by: stored.by, desc: stored.desc === true };
+    }
+  } catch {
+    // poškozená nebo nedostupná hodnota – výchozí pořadí
+  }
+  return OWN_ORDER;
+}
+
+function storeSort(sort: RowSort): void {
+  try {
+    localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
+  } catch {
+    // úložiště nedostupné (anonymní okno) – řazení platí jen do obnovení
+  }
+}
+
+/** Kam se puštěná platba položí: vedle řádku, nebo na začátek kategorie. */
+function rowTargetOf(target: DropTarget): RowTarget {
+  return target.data.type === "row"
+    ? {
+        category: target.data.row.category,
+        anchorKey: target.data.row.key,
+        after: target.after,
+      }
+    : { category: target.data.category, anchorKey: null, after: false };
+}
 const MONTH_SAVE_KEY = "month-save";
 
 type Editing =
@@ -291,6 +336,12 @@ export function MonthPage() {
     account: "",
   });
   const [direction, setDirection] = useState<Direction>("expense");
+  const [sort, setSortState] = useState<RowSort>(loadSort);
+  const setSort = (next: RowSort) => {
+    setSortState(next);
+    storeSort(next);
+  };
+  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
   const [qrQueue, setQrQueue] = useState<string[] | null>(null);
   const [invalidEdit, setInvalidEdit] = useState<string | null>(null);
@@ -313,7 +364,11 @@ export function MonthPage() {
   const expenses = rows.filter((row) => row.direction === "expense");
   const incomes = rows.filter((row) => row.direction === "income");
   const payableKeys = expenses.filter(isPayable).map((row) => row.key);
-  const categories = [...new Set(view.data.rows.map((row) => row.category))];
+  const categories = [
+    ...new Set(view.data.categories.map((category) => category.name)),
+  ];
+  const categoriesOf = (d: Direction) =>
+    view.data.categories.filter((c) => c.direction === d).map((c) => c.name);
   const filterAccounts = operatingAccountsWith(
     accounts.data ?? [],
     view.data.rows.map((row) => row.ourAccount?.id),
@@ -441,6 +496,86 @@ export function MonthPage() {
     );
   };
 
+  /** Uloží změnu pořadí/kategorií a načte měsíc znovu; pořadí platí ve všech měsících. */
+  const saveLayout = (request: () => Promise<unknown>) =>
+    save.mutate(async () => {
+      await request();
+      refreshOtherMonths();
+      return api.month(month);
+    });
+
+  const onDrop = (dragged: DragData, target: DropTarget) => {
+    setInvalidEdit(null);
+    if (dragged.type === "row") {
+      const rowTarget = rowTargetOf(target);
+      const moved = moveRow(view.data.rows, dragged.row.key, rowTarget);
+      if (!moved) return;
+      updateView((current) => ({ ...current, rows: moved.rows }));
+      saveLayout(() =>
+        api.reorderRows(month, {
+          direction: dragged.row.direction,
+          name: rowTarget.category,
+          rows: moved.categoryRows,
+        }),
+      );
+      return;
+    }
+    if (target.data.type !== "category") return;
+    const names = moveCategory(
+      categoriesOf(direction),
+      dragged.category,
+      target.data.category,
+      target.after,
+    );
+    if (!names) return;
+    updateView((current) => ({
+      ...current,
+      categories: [
+        ...current.categories.filter((c) => c.direction !== direction),
+        ...names.map((name) => ({ direction, name })),
+      ],
+    }));
+    saveLayout(() => api.orderCategories({ direction, names }));
+  };
+
+  const addCategory = (name: string) => {
+    setInvalidEdit(null);
+    if (categoriesOf(direction).includes(name)) {
+      setInvalidEdit(`Kategorie „${name}“ už existuje`);
+      return;
+    }
+    updateView((current) => ({
+      ...current,
+      categories: [...current.categories, { direction, name }],
+    }));
+    saveLayout(() => api.addCategory({ direction, name }));
+  };
+
+  const removeCategory = (name: string, moveTo: string | null) => {
+    setDeletingCategory(null);
+    updateView((current) => ({
+      ...current,
+      categories: current.categories.filter(
+        (c) => !(c.direction === direction && c.name === name),
+      ),
+      rows: current.rows.map((row) =>
+        moveTo && row.direction === direction && row.category === name
+          ? { ...row, category: moveTo }
+          : row,
+      ),
+    }));
+    saveLayout(() => api.deleteCategory({ direction, name, moveTo }));
+  };
+
+  const deleteCategory = (name: string, isEmpty: boolean) => {
+    setInvalidEdit(null);
+    if (!isEmpty) {
+      setDeletingCategory(name);
+    } else if (window.confirm(`Smazat prázdnou kategorii „${name}“?`)) {
+      removeCategory(name, null);
+    }
+  };
+
   const tableProps = {
     today: todayIso(),
     accounts: accounts.data ?? [],
@@ -482,6 +617,8 @@ export function MonthPage() {
           onFiltersChange={setFilters}
           onPayByQr={() => setQrQueue(payableKeys)}
           onAddOneOff={() => setEditing({ kind: "oneOff", row: null })}
+          sort={sort}
+          onSortChange={setSort}
         />
       )}
 
@@ -498,11 +635,19 @@ export function MonthPage() {
           id={DIRECTION_PANEL_ID}
           aria-labelledby={directionTabId(direction)}
         >
-          {direction === "expense" ? (
-            <PaymentTable title="Výdaje" rows={expenses} {...tableProps} />
-          ) : (
-            <PaymentTable title="Příjmy" rows={incomes} {...tableProps} />
-          )}
+          <MonthDnd onDrop={onDrop}>
+            <PaymentTable
+              title={direction === "expense" ? "Výdaje" : "Příjmy"}
+              rows={direction === "expense" ? expenses : incomes}
+              allRows={view.data.rows.filter((r) => r.direction === direction)}
+              categories={categoriesOf(direction)}
+              actions={tableProps}
+              sort={sort}
+              onSortChange={setSort}
+              onAddCategory={addCategory}
+              onDeleteCategory={deleteCategory}
+            />
+          </MonthDnd>
         </div>
       </div>
       <AccountBreakdown rows={view.data.accounts} />
@@ -536,6 +681,20 @@ export function MonthPage() {
           onSave={onSaveOneOff(editing.row)}
           onDelete={deleteRow}
           onClose={closeEditing}
+        />
+      )}
+      {deletingCategory != null && (
+        <DeleteCategoryDialog
+          category={deletingCategory}
+          paymentCount={
+            view.data.rows.filter(
+              (r) =>
+                r.direction === direction && r.category === deletingCategory,
+            ).length
+          }
+          others={categoriesOf(direction).filter((c) => c !== deletingCategory)}
+          onConfirm={(moveTo) => removeCategory(deletingCategory, moveTo)}
+          onClose={() => setDeletingCategory(null)}
         />
       )}
       {forwardOffer && (

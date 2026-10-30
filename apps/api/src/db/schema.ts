@@ -128,6 +128,23 @@ export const items = pgTable(
 );
 
 /**
+ * Pořadí kategorií a prázdné kategorie. Kategorie je jinak jen text
+ * u položek a plateb; ty, které tu nejsou, se řadí za tyto podle položek.
+ */
+export const categories = pgTable(
+  "categories",
+  {
+    id: serial().primaryKey(),
+    direction: directionEnum().notNull(),
+    name: text().notNull(),
+    sortOrder: integer().notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex("categories_direction_name").on(table.direction, table.name),
+  ],
+);
+
+/**
  * Změna hodnot položky platná od měsíce dál (nová záloha, zdražení…).
  * Prázdné pole = beze změny; minulé měsíce se tím nepřepíšou.
  */
@@ -183,6 +200,10 @@ export const monthEntries = pgTable(
     counterpartyId: integer().references(() => counterparties.id, {
       onDelete: "set null",
     }),
+    /** Jednorázová platba v kategorii hned za touto položkou (null = na začátku). */
+    afterItemId: integer().references(() => items.id, { onDelete: "set null" }),
+    /** Pořadí jednorázové platby; null = ještě nepřesunutá, je na konci kategorie. */
+    sortOrder: integer(),
   },
   (table) => [
     uniqueIndex("month_entries_month_item").on(table.month, table.itemId),

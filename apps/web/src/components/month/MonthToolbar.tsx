@@ -2,8 +2,45 @@ import type { Account } from "@kkff/api/contracts";
 import { Plus, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Select } from "@/components/ui/field";
+import type { RowSort } from "@/lib/monthRows";
 
 export const NO_ACCOUNT = "none";
+
+const SORT_OPTIONS: { value: string; label: string; sort: RowSort }[] = [
+  { value: "own", label: "Vlastní pořadí", sort: { by: "own", desc: false } },
+  {
+    value: "due",
+    label: "Splatnost – nejdřívější",
+    sort: { by: "due", desc: false },
+  },
+  {
+    value: "due-desc",
+    label: "Splatnost – nejpozdější",
+    sort: { by: "due", desc: true },
+  },
+  {
+    value: "amount-desc",
+    label: "Částka – nejvyšší",
+    sort: { by: "amount", desc: true },
+  },
+  {
+    value: "amount",
+    label: "Částka – nejnižší",
+    sort: { by: "amount", desc: false },
+  },
+  {
+    value: "status",
+    label: "Nezaplacené první",
+    sort: { by: "status", desc: false },
+  },
+  {
+    value: "status-desc",
+    label: "Zaplacené první",
+    sort: { by: "status", desc: true },
+  },
+];
+
+const sortValue = ({ by, desc }: RowSort) => (desc ? `${by}-desc` : by);
 
 export interface Filters {
   showZero: boolean;
@@ -18,6 +55,8 @@ interface MonthToolbarProps {
   onFiltersChange: (filters: Filters) => void;
   onPayByQr: () => void;
   onAddOneOff: () => void;
+  sort: RowSort;
+  onSortChange: (sort: RowSort) => void;
 }
 
 export function MonthToolbar({
@@ -27,6 +66,8 @@ export function MonthToolbar({
   onFiltersChange,
   onPayByQr,
   onAddOneOff,
+  sort,
+  onSortChange,
 }: MonthToolbarProps) {
   return (
     <div className="space-y-3 md:flex md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:space-y-0">
@@ -57,6 +98,22 @@ export function MonthToolbar({
             </option>
           ))}
           <option value={NO_ACCOUNT}>Bez vyplněného účtu</option>
+        </Select>
+      </div>
+      <div className="md:w-56">
+        <Select
+          aria-label="Řazení plateb v kategoriích"
+          value={sortValue(sort)}
+          onChange={(e) => {
+            const option = SORT_OPTIONS.find((o) => o.value === e.target.value);
+            if (option) onSortChange(option.sort);
+          }}
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </Select>
       </div>
       <div className="flex flex-wrap gap-x-5 gap-y-2">

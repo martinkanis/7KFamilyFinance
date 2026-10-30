@@ -60,6 +60,7 @@ const catalog: PlannerCatalog = {
       vs: "77",
     },
   ],
+  categories: [],
   insuranceReserve: 1000,
 };
 
@@ -81,6 +82,7 @@ function monthView(): MonthView {
   return {
     month: MONTH,
     rows,
+    categories: [],
     summary: summarizeMonth(rows),
     accounts: breakdownByAccount(rows, catalog.accounts),
     correction: { amount: 0, note: null },

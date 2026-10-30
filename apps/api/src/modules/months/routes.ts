@@ -10,6 +10,7 @@ import {
   nullableText,
   requiredText,
 } from "../../lib/schemas.ts";
+import { reorderRows } from "../categories/service.ts";
 import {
   createOneOff,
   deleteOneOff,
@@ -110,6 +111,27 @@ export const monthRoutes = new Elysia({ prefix: "/api/months/:month" })
       return getMonthView(params.month);
     },
     { params: monthEntryParams },
+  )
+  .put(
+    "/order",
+    async ({ params, body }): Promise<MonthView> => {
+      await reorderRows(params.month, { ...body, name: body.name.trim() });
+      return getMonthView(params.month);
+    },
+    {
+      params: monthParams,
+      body: t.Object({
+        direction: t.Union([t.Literal("expense"), t.Literal("income")]),
+        name: requiredText(),
+        rows: t.Array(
+          t.Object({
+            kind: t.Union([t.Literal("item"), t.Literal("oneOff")]),
+            id: t.Integer({ minimum: 1 }),
+          }),
+          { maxItems: 500 },
+        ),
+      }),
+    },
   )
   .put(
     "/correction",

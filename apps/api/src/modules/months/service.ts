@@ -13,6 +13,7 @@ import {
   breakdownByAccount,
   buildMonthRows,
   indexCatalog,
+  monthCategories,
   summarizeMonth,
 } from "../../domain/planner.ts";
 import { endingFrom } from "../../domain/schedule.ts";
@@ -36,10 +37,12 @@ export async function getMonthView(month: string): Promise<MonthView> {
     loadEntriesOfMonth(month),
     loadCorrection(month),
   ]);
-  const rows = buildMonthRows(month, indexCatalog(catalog), entries);
+  const index = indexCatalog(catalog);
+  const rows = buildMonthRows(month, index, entries);
   return {
     month,
     rows,
+    categories: monthCategories(index, rows),
     summary: summarizeMonth(rows),
     accounts: breakdownByAccount(rows, catalog.accounts),
     correction,
