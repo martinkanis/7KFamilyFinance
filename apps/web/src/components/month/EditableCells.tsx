@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { EditableSelect, EditableText } from "@/components/ui/editable";
 import type { ComboOption } from "@/lib/accountOptions";
 import { operatingAccountsWith } from "@/lib/accounts";
+import { numberedCategory } from "@/lib/categoryNumbers";
 import { cn } from "@/lib/cn";
 import { formatDate, formatMoney, safeUrl } from "@/lib/format";
 import {
@@ -74,10 +75,13 @@ export function NameCell({
 
 export function CategoryName({
   category,
+  number,
   onRenameCategory,
   onInvalid,
 }: Pick<RowEditing, "onRenameCategory" | "onInvalid"> & {
   category: string;
+  /** Pořadové číslo kategorie – jen zobrazení, při úpravě se mění samotný název. */
+  number: number | null;
 }) {
   return (
     <EditableText
@@ -88,7 +92,9 @@ export function CategoryName({
         if (name) onRenameCategory(category, name);
         else onInvalid("Kategorie nesmí být prázdná");
       }}
-    />
+    >
+      {numberedCategory(category, number)}
+    </EditableText>
   );
 }
 

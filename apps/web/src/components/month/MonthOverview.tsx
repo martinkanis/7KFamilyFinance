@@ -12,6 +12,7 @@ import {
   sharesOf,
 } from "@/components/ui/breakdown";
 import { Card } from "@/components/ui/card";
+import { categoryNumber, numberedCategory } from "@/lib/categoryNumbers";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
 import { categoryBreakdown } from "@/lib/monthBreakdown";
@@ -174,11 +175,20 @@ export function MonthOverview({
 }) {
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const text = DIRECTION_TEXT[direction];
+  const categoryNames = view.categories
+    .filter((c) => c.direction === direction)
+    .map((c) => c.name);
   const segments = categoryBreakdown(
     view.rows,
     direction,
     previous?.rows ?? null,
-  );
+  ).map((segment) => ({
+    ...segment,
+    label: numberedCategory(
+      segment.label,
+      categoryNumber(categoryNames, segment.key),
+    ),
+  }));
   const shares = sharesOf(segments);
   const planChange = (d: Direction) =>
     previous ? view.summary[d].plan - previous.summary[d].plan : null;

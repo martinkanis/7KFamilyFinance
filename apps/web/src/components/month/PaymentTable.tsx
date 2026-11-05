@@ -4,6 +4,7 @@ import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { Input } from "@/components/ui/field";
+import { categoryNumber } from "@/lib/categoryNumbers";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
 import {
@@ -362,6 +363,7 @@ interface GroupProps
     Pick<CategoryActions, "onDeleteCategory" | "onAddPayment"> {
   group: CategoryGroup;
   isEmpty: boolean;
+  number: number | null;
 }
 
 /** Záhlaví kategorie: úchyt, název (přejmenování), součty a koš. */
@@ -407,7 +409,7 @@ function CategoryButtons({
 const EMPTY_HINT =
   "Prázdná kategorie – přetáhni sem platbu nebo ji přidej přes +";
 
-function CardGroup({ group, isEmpty, ...actions }: GroupProps) {
+function CardGroup({ group, isEmpty, number, ...actions }: GroupProps) {
   const dnd = useCategoryDnd(group.category);
   return (
     <div className={cn("mb-4", dnd.isDragging && "opacity-40")}>
@@ -427,6 +429,7 @@ function CardGroup({ group, isEmpty, ...actions }: GroupProps) {
         <span className="min-w-0 flex-1 font-semibold text-brand-700">
           <CategoryName
             category={group.category}
+            number={number}
             onRenameCategory={actions.onRenameCategory}
             onInvalid={actions.onInvalid}
           />
@@ -456,7 +459,7 @@ function CardGroup({ group, isEmpty, ...actions }: GroupProps) {
   );
 }
 
-function TableGroup({ group, isEmpty, ...actions }: GroupProps) {
+function TableGroup({ group, isEmpty, number, ...actions }: GroupProps) {
   const dnd = useCategoryDnd(group.category);
   return (
     <tbody className={cn(dnd.isDragging && "opacity-40")}>
@@ -476,6 +479,7 @@ function TableGroup({ group, isEmpty, ...actions }: GroupProps) {
             />
             <CategoryName
               category={group.category}
+              number={number}
               onRenameCategory={actions.onRenameCategory}
               onInvalid={actions.onInvalid}
             />
@@ -598,6 +602,7 @@ function groupsOf(props: ViewProps) {
     .map((group) => ({
       group: { ...group, rows: sortRows(group.rows, sort) },
       isEmpty: !used.has(group.category),
+      number: categoryNumber(categories, group.category),
     }))
     .filter(({ group, isEmpty }) => group.rows.length > 0 || isEmpty);
 }
@@ -616,11 +621,12 @@ function Cards(props: ViewProps) {
           Nic k zobrazení
         </p>
       )}
-      {groups.map(({ group, isEmpty }) => (
+      {groups.map(({ group, isEmpty, number }) => (
         <CardGroup
           key={group.category}
           group={group}
           isEmpty={isEmpty}
+          number={number}
           {...actions}
           onDeleteCategory={props.onDeleteCategory}
           onAddPayment={props.onAddPayment}
@@ -664,11 +670,12 @@ function Table(props: ViewProps) {
             <th className="py-2.5 pr-4 pl-2" />
           </tr>
         </thead>
-        {groups.map(({ group, isEmpty }) => (
+        {groups.map(({ group, isEmpty, number }) => (
           <TableGroup
             key={group.category}
             group={group}
             isEmpty={isEmpty}
+            number={number}
             {...actions}
             onDeleteCategory={props.onDeleteCategory}
             onAddPayment={props.onAddPayment}
