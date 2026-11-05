@@ -15,8 +15,9 @@ import { Card } from "@/components/ui/card";
 import { categoryNumber, numberedCategory } from "@/lib/categoryNumbers";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
-import { categoryBreakdown } from "@/lib/monthBreakdown";
+import { type CategorySegment, categoryBreakdown } from "@/lib/monthBreakdown";
 import { DESKTOP_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
+import { MonthCharts } from "./MonthCharts";
 
 const DIRECTION_TEXT: Record<
   Direction,
@@ -159,6 +160,26 @@ function BalanceStat({ view }: { view: MonthView }) {
   );
 }
 
+/** Rozpad směru podle kategorií s čísly kategorií jako v tabulce. */
+function numberedBreakdown(
+  view: MonthView,
+  direction: Direction,
+  previous: MonthView | undefined,
+): CategorySegment[] {
+  const categoryNames = view.categories
+    .filter((c) => c.direction === direction)
+    .map((c) => c.name);
+  return categoryBreakdown(view.rows, direction, previous?.rows ?? null).map(
+    (segment) => ({
+      ...segment,
+      label: numberedCategory(
+        segment.label,
+        categoryNumber(categoryNames, segment.key),
+      ),
+    }),
+  );
+}
+
 /**
  * Přehled měsíce nahoře: výdaje, příjmy a bilance a rozpad vybraného směru
  * (záložka Výdaje/Příjmy) podle kategorií. Na telefonu je rozpad sbalený.
@@ -175,20 +196,8 @@ export function MonthOverview({
 }) {
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
   const text = DIRECTION_TEXT[direction];
-  const categoryNames = view.categories
-    .filter((c) => c.direction === direction)
-    .map((c) => c.name);
-  const segments = categoryBreakdown(
-    view.rows,
-    direction,
-    previous?.rows ?? null,
-  ).map((segment) => ({
-    ...segment,
-    label: numberedCategory(
-      segment.label,
-      categoryNumber(categoryNames, segment.key),
-    ),
-  }));
+  const breakdownOf = (d: Direction) => numberedBreakdown(view, d, previous);
+  const segments = breakdownOf(direction);
   const shares = sharesOf(segments);
   const planChange = (d: Direction) =>
     previous ? view.summary[d].plan - previous.summary[d].plan : null;
@@ -257,6 +266,23 @@ export function MonthOverview({
           </div>
         </details>
       )}
+      <details
+        key={`charts-${isDesktop}`}
+        open={isDesktop}
+        className="group/charts mt-5 border-t border-slate-100 pt-4"
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
+          Grafy – výdaje, příjmy a bilance
+          <ChevronDown className="size-4 text-slate-400 transition-transform group-open/charts:rotate-180" />
+        </summary>
+        <div className="mt-4">
+          <MonthCharts
+            summary={view.summary}
+            expense={breakdownOf("expense")}
+            income={breakdownOf("income")}
+          />
+        </div>
+      </details>
     </Card>
   );
 }
