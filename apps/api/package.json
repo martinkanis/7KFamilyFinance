@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     "./contracts": "./src/contracts.ts",
-    "./accountTypes": "./src/domain/accountTypes.ts"
+    "./accountTypes": "./src/domain/accountTypes.ts",
+    "./categoryTree": "./src/domain/categoryTree.ts"
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",

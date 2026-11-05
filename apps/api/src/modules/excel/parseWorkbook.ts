@@ -59,7 +59,8 @@ export type ImportedItem = Omit<
 export interface ImportedCategory {
   direction: Direction;
   name: string;
-  typeName: string | null;
+  /** Nadřazená kategorie (ve starších zálohách nadkategorie). */
+  parent: string | null;
 }
 
 export interface ImportedEntry {
@@ -105,7 +106,6 @@ export interface ImportData {
   insurance: InsurancePolicyInput[];
   items: ImportedItem[];
   itemChanges: ImportedItemChange[];
-  categoryTypes: string[];
   paymentTypes: string[];
   categories: ImportedCategory[];
   entries: ImportedEntry[];
@@ -475,11 +475,8 @@ function parseItemChanges(wb: ExcelJS.Workbook): ImportedItemChange[] {
   });
 }
 
-/** List „Typy“: nadkategorie a typy plateb v pořadí. Volitelný. */
-function parseTypes(wb: ExcelJS.Workbook): {
-  categoryTypes: string[];
-  paymentTypes: string[];
-} {
+/** List „Typy“: typy plateb v pořadí. Volitelný. */
+function parseTypes(wb: ExcelJS.Workbook): { paymentTypes: string[] } {
   const rows = rowsWithKey(wb.getWorksheet(SHEETS.types), FIRST_TABLE_ROW, 2);
   const namesOf = (kind: string) => [
     ...new Set(
@@ -489,13 +486,10 @@ function parseTypes(wb: ExcelJS.Workbook): {
         .filter((name): name is string => name != null),
     ),
   ];
-  return {
-    categoryTypes: namesOf(TYPE_KINDS.category),
-    paymentTypes: namesOf(TYPE_KINDS.payment),
-  };
+  return { paymentTypes: namesOf(TYPE_KINDS.payment) };
 }
 
-/** List „Kategorie“: pořadí kategorií (i prázdných) a nadkategorie. Volitelný. */
+/** List „Kategorie“: strom kategorií (i prázdných) v pořadí. Volitelný. */
 function parseCategories(wb: ExcelJS.Workbook): ImportedCategory[] {
   return rowsWithKey(
     wb.getWorksheet(SHEETS.categories),
@@ -505,7 +499,7 @@ function parseCategories(wb: ExcelJS.Workbook): ImportedCategory[] {
     const direction = reverseLabel(DIRECTION_LABELS, textOf(cell(1)));
     const name = textOf(cell(2));
     return direction && name
-      ? [{ direction, name, typeName: textOf(cell(3)) }]
+      ? [{ direction, name, parent: textOf(cell(3)) }]
       : [];
   });
 }

@@ -106,11 +106,15 @@ function Donut({
   );
 }
 
-export type ChartGrouping = "category" | "categoryType" | "paymentType";
+export type ChartGrouping = "category" | "rootCategory" | "paymentType";
 
 const GROUPINGS: { value: ChartGrouping; label: string; of: string }[] = [
   { value: "category", label: "Kategorie", of: "kategorií" },
-  { value: "categoryType", label: "Nadkategorie", of: "nadkategorií" },
+  {
+    value: "rootCategory",
+    label: "Hlavní kategorie",
+    of: "hlavních kategorií",
+  },
   { value: "paymentType", label: "Typ platby", of: "typu platby" },
 ];
 
@@ -141,11 +145,8 @@ export function MonthCharts({
   ];
   return (
     <div>
-      <div
-        role="group"
-        aria-label="Grafy podle"
-        className="mb-4 inline-flex rounded-lg bg-slate-100 p-0.5 text-sm"
-      >
+      <fieldset className="mb-4 inline-flex rounded-lg bg-slate-100 p-0.5 text-sm">
+        <legend className="sr-only">Grafy podle</legend>
         {GROUPINGS.map((option) => (
           <button
             key={option.value}
@@ -162,7 +163,7 @@ export function MonthCharts({
             {option.label}
           </button>
         ))}
-      </div>
+      </fieldset>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Donut
           title={`Výdaje podle ${of}`}

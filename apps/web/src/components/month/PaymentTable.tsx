@@ -1,14 +1,10 @@
-import type {
-  CategoryType,
-  MonthRow,
-  PaymentStatus,
-} from "@kkff/api/contracts";
+import { type TreeNode, treeOrder } from "@kkff/api/categoryTree";
+import type { MonthRow, PaymentStatus } from "@kkff/api/contracts";
 import { ArrowDown, ArrowUp, Copy, Pencil, Plus, QrCode } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { Input } from "@/components/ui/field";
-import { categoryNumber } from "@/lib/categoryNumbers";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
 import {
@@ -26,7 +22,6 @@ import {
   AccountCell,
   AmountCell,
   CategoryName,
-  CategoryTypeCell,
   DetailCells,
   DueCell,
   NameCell,
@@ -69,10 +64,6 @@ interface RowActions extends RowEditing {
 }
 
 interface CategoryActions {
-  categoryTypes: CategoryType[];
-  /** Nadkategorie kategorie (null = žádná). */
-  categoryTypeOf: (category: string) => number | null;
-  onSetCategoryType: (category: string, typeId: number | null) => void;
   onAddCategory: (name: string) => void;
   onAddPayment: (category: string) => void;
   onDeleteCategory: (category: string, isEmpty: boolean) => void;
@@ -85,8 +76,8 @@ interface PaymentTableProps extends CategoryActions {
   rows: MonthRow[];
   /** Všechny platby směru – podle nich se pozná prázdná kategorie. */
   allRows: MonthRow[];
-  /** Kategorie směru v pořadí, i prázdné. */
-  categories: string[];
+  /** Strom kategorií směru (pořadí, nadřazené kategorie), i prázdné. */
+  tree: TreeNode[];
   sort: RowSort;
   onSortChange: (sort: RowSort) => void;
 }
@@ -169,8 +160,9 @@ function PaymentRow({
   onQr,
   onDelete,
   onDuplicate,
+  depth = 0,
   ...editing
-}: RowActions & { row: MonthRow }) {
+}: RowActions & { row: MonthRow; depth?: number }) {
   const isZero = row.amount === 0;
   const overdue = isOverdue(row, today);
   const dnd = useDndItem(
@@ -195,7 +187,7 @@ function PaymentRow({
       )}
     >
       <td className="py-2 pr-2 pl-1 align-top">
-        <div className="flex items-start gap-1">
+        <div className="flex items-start gap-1" style={indent(depth)}>
           <DragHandle
             label={`Přetáhnout „${row.name}“`}
             handle={dnd.handle}
@@ -370,27 +362,39 @@ function PaymentCard({
   );
 }
 
-function remainingLabel(group: CategoryGroup): string {
-  if (group.rows.length === 0) return "";
-  return group.remaining === 0
+/** Součty kategorie i se všemi podkategoriemi. */
+interface CategoryTotal {
+  count: number;
+  plan: number;
+  remaining: number;
+}
+
+function remainingLabel(total: CategoryTotal): string {
+  if (total.count === 0) return "";
+  return total.remaining === 0
     ? "hotovo ✓"
-    : `zbývá ${formatMoney(group.remaining)}`;
+    : `zbývá ${formatMoney(total.remaining)}`;
+}
+
+interface GroupInfo {
+  group: CategoryGroup;
+  /** Kategorie sama nemá v měsíci žádnou platbu (smaže se bez ptaní). */
+  isEmpty: boolean;
+  number: string | null;
+  depth: number;
+  hasChildren: boolean;
+  total: CategoryTotal;
 }
 
 interface GroupProps
   extends RowActions,
-    Pick<
-      CategoryActions,
-      | "onDeleteCategory"
-      | "onAddPayment"
-      | "categoryTypes"
-      | "categoryTypeOf"
-      | "onSetCategoryType"
-    > {
-  group: CategoryGroup;
-  isEmpty: boolean;
-  number: number | null;
-}
+    GroupInfo,
+    Pick<CategoryActions, "onDeleteCategory" | "onAddPayment"> {}
+
+/** Odsazení podkategorie podle hloubky ve stromu. */
+const indent = (depth: number, step = 1.25) => ({
+  paddingLeft: `${depth * step}rem`,
+});
 
 /** Záhlaví kategorie: úchyt, název (přejmenování), součty a koš. */
 function useCategoryDnd(category: string) {
@@ -435,10 +439,22 @@ function CategoryButtons({
 const EMPTY_HINT =
   "Prázdná kategorie – přetáhni sem platbu nebo ji přidej přes +";
 
-function CardGroup({ group, isEmpty, number, ...actions }: GroupProps) {
+function CardGroup({
+  group,
+  isEmpty,
+  number,
+  depth,
+  hasChildren,
+  total,
+  ...actions
+}: GroupProps) {
   const dnd = useCategoryDnd(group.category);
   return (
-    <div className={cn("mb-4", dnd.isDragging && "opacity-40")}>
+    <div
+      className={cn("mb-4", dnd.isDragging && "opacity-40")}
+      // Na telefonu menší odsazení, ať karty zůstanou široké.
+      style={indent(depth, 0.75)}
+    >
       <div
         ref={dnd.setNodeRef}
         {...dnd.listeners}
@@ -452,24 +468,22 @@ function CardGroup({ group, isEmpty, number, ...actions }: GroupProps) {
           handle={dnd.handle}
           className="p-1"
         />
-        <span className="min-w-0 flex-1 font-semibold text-brand-700">
+        <span
+          className={cn(
+            "min-w-0 flex-1 text-brand-700",
+            depth === 0 ? "font-semibold" : "font-medium",
+          )}
+        >
           <CategoryName
             category={group.category}
             number={number}
             onRenameCategory={actions.onRenameCategory}
             onInvalid={actions.onInvalid}
           />
-          <CategoryTypeCell
-            typeId={actions.categoryTypeOf(group.category)}
-            categoryTypes={actions.categoryTypes}
-            onPick={(typeId) =>
-              actions.onSetCategoryType(group.category, typeId)
-            }
-          />
         </span>
         <span className="shrink-0 text-xs text-slate-500">
-          {group.rows.length > 0 &&
-            `${formatMoney(group.plan)} · ${remainingLabel(group)}`}
+          {total.count > 0 &&
+            `${formatMoney(total.plan)} · ${remainingLabel(total)}`}
         </span>
         <CategoryButtons
           group={group}
@@ -482,7 +496,7 @@ function CardGroup({ group, isEmpty, number, ...actions }: GroupProps) {
         {group.rows.map((row) => (
           <PaymentCard key={row.key} row={row} {...actions} />
         ))}
-        {group.rows.length === 0 && (
+        {group.rows.length === 0 && !hasChildren && (
           <li className="rounded-xl border border-dashed border-slate-300 p-3 text-center text-xs text-slate-500">
             {EMPTY_HINT}
           </li>
@@ -492,7 +506,15 @@ function CardGroup({ group, isEmpty, number, ...actions }: GroupProps) {
   );
 }
 
-function TableGroup({ group, isEmpty, number, ...actions }: GroupProps) {
+function TableGroup({
+  group,
+  isEmpty,
+  number,
+  depth,
+  hasChildren,
+  total,
+  ...actions
+}: GroupProps) {
   const dnd = useCategoryDnd(group.category);
   return (
     <tbody className={cn(dnd.isDragging && "opacity-40")}>
@@ -500,12 +522,15 @@ function TableGroup({ group, isEmpty, number, ...actions }: GroupProps) {
         ref={dnd.setNodeRef}
         {...dnd.listeners}
         className={cn(
-          "group bg-brand-50 text-sm font-semibold text-brand-700",
+          "group text-sm text-brand-700",
+          depth === 0
+            ? "bg-brand-50 font-semibold"
+            : "bg-brand-50/50 font-medium",
           dnd.drop && DROP_LINE[dnd.drop],
         )}
       >
         <td className="py-1.5 pl-1" colSpan={3}>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" style={indent(depth)}>
             <DragHandle
               label={`Přetáhnout kategorii „${group.category}“`}
               handle={dnd.handle}
@@ -516,20 +541,13 @@ function TableGroup({ group, isEmpty, number, ...actions }: GroupProps) {
               onRenameCategory={actions.onRenameCategory}
               onInvalid={actions.onInvalid}
             />
-            <CategoryTypeCell
-              typeId={actions.categoryTypeOf(group.category)}
-              categoryTypes={actions.categoryTypes}
-              onPick={(typeId) =>
-                actions.onSetCategoryType(group.category, typeId)
-              }
-            />
           </div>
         </td>
         <td className="px-2 py-1.5 text-right tabular-nums">
-          {group.rows.length > 0 && formatMoney(group.plan)}
+          {total.count > 0 && formatMoney(total.plan)}
         </td>
         <td className="px-2 py-1.5 text-xs font-medium">
-          {remainingLabel(group)}
+          {remainingLabel(total)}
         </td>
         <td className="py-1 pr-4 pl-2 text-right">
           <CategoryButtons
@@ -541,9 +559,9 @@ function TableGroup({ group, isEmpty, number, ...actions }: GroupProps) {
         </td>
       </tr>
       {group.rows.map((row) => (
-        <PaymentRow key={row.key} row={row} {...actions} />
+        <PaymentRow key={row.key} row={row} depth={depth} {...actions} />
       ))}
-      {group.rows.length === 0 && (
+      {group.rows.length === 0 && !hasChildren && (
         <tr>
           <td
             colSpan={6}
@@ -635,16 +653,53 @@ function SortHeader({
   );
 }
 
-function groupsOf(props: ViewProps) {
-  const { rows, allRows, categories, sort } = props;
+/**
+ * Skupiny v pořadí stromu. Kategorie se ukáže, když má zobrazené platby,
+ * je úplně prázdná, nebo se ukazuje některá její podkategorie.
+ */
+function groupsOf(props: ViewProps): GroupInfo[] {
+  const { rows, allRows, tree, sort } = props;
+  const ordered = treeOrder(tree);
+  const nodeOf = new Map(ordered.map((node) => [node.name, node]));
   const used = new Set(allRows.map((row) => row.category));
-  return groupByCategory(rows, categories)
-    .map((group) => ({
+  const infos: GroupInfo[] = groupByCategory(
+    rows,
+    ordered.map((node) => node.name),
+  ).map((group) => {
+    const node = nodeOf.get(group.category);
+    return {
       group: { ...group, rows: sortRows(group.rows, sort) },
       isEmpty: !used.has(group.category),
-      number: categoryNumber(categories, group.category),
-    }))
-    .filter(({ group, isEmpty }) => group.rows.length > 0 || isEmpty);
+      number: node?.number ?? null,
+      depth: node?.depth ?? 0,
+      hasChildren: false,
+      total: {
+        count: group.rows.length,
+        plan: group.plan,
+        remaining: group.remaining,
+      },
+    };
+  });
+  const byName = new Map(infos.map((info) => [info.group.category, info]));
+  const visible = new Set<string>();
+  // Odspodu: součty a viditelnost se přičtou ke všem nadřazeným kategoriím.
+  for (const info of [...infos].reverse()) {
+    const name = info.group.category;
+    // Prázdná kategorie se ukáže, jen když nemá podkategorie (u nadřazené
+    // rozhodnou ty).
+    if (info.group.rows.length > 0 || (info.isEmpty && !info.hasChildren)) {
+      visible.add(name);
+    }
+    const parentName = nodeOf.get(name)?.parent;
+    const parent = parentName == null ? undefined : byName.get(parentName);
+    if (!parent) continue;
+    parent.hasChildren = true;
+    parent.total.count += info.total.count;
+    parent.total.plan += info.total.plan;
+    parent.total.remaining += info.total.remaining;
+    if (visible.has(name)) visible.add(parent.group.category);
+  }
+  return infos.filter((info) => visible.has(info.group.category));
 }
 
 type ViewProps = Omit<PaymentTableProps, "actions"> & { actions: RowActions };
@@ -661,18 +716,13 @@ function Cards(props: ViewProps) {
           Nic k zobrazení
         </p>
       )}
-      {groups.map(({ group, isEmpty, number }) => (
+      {groups.map((info) => (
         <CardGroup
-          key={group.category}
-          group={group}
-          isEmpty={isEmpty}
-          number={number}
+          key={info.group.category}
+          {...info}
           {...actions}
           onDeleteCategory={props.onDeleteCategory}
           onAddPayment={props.onAddPayment}
-          categoryTypes={props.categoryTypes}
-          categoryTypeOf={props.categoryTypeOf}
-          onSetCategoryType={props.onSetCategoryType}
         />
       ))}
     </section>
@@ -713,18 +763,13 @@ function Table(props: ViewProps) {
             <th className="py-2.5 pr-4 pl-2" />
           </tr>
         </thead>
-        {groups.map(({ group, isEmpty, number }) => (
+        {groups.map((info) => (
           <TableGroup
-            key={group.category}
-            group={group}
-            isEmpty={isEmpty}
-            number={number}
+            key={info.group.category}
+            {...info}
             {...actions}
             onDeleteCategory={props.onDeleteCategory}
             onAddPayment={props.onAddPayment}
-            categoryTypes={props.categoryTypes}
-            categoryTypeOf={props.categoryTypeOf}
-            onSetCategoryType={props.onSetCategoryType}
           />
         ))}
         {groups.length === 0 && (

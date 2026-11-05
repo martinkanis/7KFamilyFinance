@@ -1,3 +1,4 @@
+import { moveNode, type TreeNode, treeOrder } from "@kkff/api/categoryTree";
 import type {
   ChangeableField,
   Direction,
@@ -59,7 +60,6 @@ import {
   entryInputOf,
   isPayable,
   itemEntryWithStatus,
-  moveCategory,
   moveRow,
   OWN_ORDER,
   oneOffInputOf,
@@ -339,10 +339,6 @@ export function MonthPage() {
     queryKey: ["counterparties"],
     queryFn: () => api.list("counterparties"),
   });
-  const categoryTypes = useQuery({
-    queryKey: ["category-types"],
-    queryFn: () => api.list("category-types"),
-  });
   const paymentTypes = useQuery({
     queryKey: ["payment-types"],
     queryFn: () => api.list("payment-types"),
@@ -388,6 +384,23 @@ export function MonthPage() {
   ];
   const categoriesOf = (d: Direction) =>
     view.data.categories.filter((c) => c.direction === d).map((c) => c.name);
+  const treeOf = (d: Direction): TreeNode[] =>
+    view.data.categories
+      .filter((c) => c.direction === d)
+      .map(({ name, parent }) => ({ name, parent }));
+  /** Okamžitě ukáže nový strom kategorií směru (než odpoví server). */
+  const replaceTree = (nodes: TreeNode[]) =>
+    updateView((current) => ({
+      ...current,
+      categories: [
+        ...current.categories.filter((c) => c.direction !== direction),
+        ...treeOrder(nodes).map(({ name, parent }) => ({
+          direction,
+          name,
+          parent,
+        })),
+      ],
+    }));
   const filterAccounts = operatingAccountsWith(
     accounts.data ?? [],
     view.data.rows.map((row) => row.ourAccount?.id),
@@ -585,32 +598,15 @@ export function MonthPage() {
       return;
     }
     if (target.data.type !== "category") return;
-    const names = moveCategory(
-      categoriesOf(direction),
+    const nodes = moveNode(
+      treeOf(direction),
       dragged.category,
       target.data.category,
-      target.after,
+      target.zone,
     );
-    if (!names) return;
-    updateView((current) => {
-      const typeOf = new Map(
-        current.categories
-          .filter((c) => c.direction === direction)
-          .map((c) => [c.name, c.typeId]),
-      );
-      return {
-        ...current,
-        categories: [
-          ...current.categories.filter((c) => c.direction !== direction),
-          ...names.map((name) => ({
-            direction,
-            name,
-            typeId: typeOf.get(name) ?? null,
-          })),
-        ],
-      };
-    });
-    saveLayout(() => api.orderCategories({ direction, names }));
+    if (!nodes) return;
+    replaceTree(nodes);
+    saveLayout(() => api.saveCategoryTree({ direction, nodes }));
   };
 
   const addCategory = (name: string) => {
@@ -621,18 +617,25 @@ export function MonthPage() {
     }
     updateView((current) => ({
       ...current,
-      categories: [...current.categories, { direction, name, typeId: null }],
+      categories: [...current.categories, { direction, name, parent: null }],
     }));
     saveLayout(() => api.addCategory({ direction, name }));
   };
 
   const removeCategory = (name: string, moveTo: string | null) => {
     setDeletingCategory(null);
+    const parentOfDeleted =
+      treeOf(direction).find((node) => node.name === name)?.parent ?? null;
     updateView((current) => ({
       ...current,
-      categories: current.categories.filter(
-        (c) => !(c.direction === direction && c.name === name),
-      ),
+      // Podkategorie smazané kategorie se posunou o úroveň výš (jako na serveru).
+      categories: current.categories
+        .filter((c) => !(c.direction === direction && c.name === name))
+        .map((c) =>
+          c.direction === direction && c.parent === name
+            ? { ...c, parent: parentOfDeleted }
+            : c,
+        ),
       rows: current.rows.map((row) =>
         moveTo && row.direction === direction && row.category === name
           ? { ...row, category: moveTo }
@@ -644,9 +647,13 @@ export function MonthPage() {
 
   const deleteCategory = (name: string, isEmpty: boolean) => {
     setInvalidEdit(null);
+    const hasChildren = treeOf(direction).some((node) => node.parent === name);
+    const question =
+      `Smazat prázdnou kategorii „${name}“?` +
+      (hasChildren ? "\n\nJejí podkategorie se posunou o úroveň výš." : "");
     if (!isEmpty) {
       setDeletingCategory(name);
-    } else if (window.confirm(`Smazat prázdnou kategorii „${name}“?`)) {
+    } else if (window.confirm(question)) {
       removeCategory(name, null);
     }
   };
@@ -682,24 +689,6 @@ export function MonthPage() {
     });
   };
 
-  const categoryTypeOf = (category: string) =>
-    view.data.categories.find(
-      (c) => c.direction === direction && c.name === category,
-    )?.typeId ?? null;
-
-  const setCategoryType = (category: string, typeId: number | null) => {
-    setInvalidEdit(null);
-    updateView((current) => ({
-      ...current,
-      categories: current.categories.map((c) =>
-        c.direction === direction && c.name === category ? { ...c, typeId } : c,
-      ),
-    }));
-    saveLayout(() =>
-      api.setCategoryType({ direction, name: category, typeId }),
-    );
-  };
-
   const tableProps = {
     today: todayIso(),
     paymentTypes: paymentTypes.data ?? [],
@@ -733,7 +722,6 @@ export function MonthPage() {
         view={view.data}
         previous={previousView.data}
         direction={direction}
-        categoryTypes={categoryTypes.data ?? []}
         paymentTypes={paymentTypes.data ?? []}
       />
 
@@ -770,14 +758,11 @@ export function MonthPage() {
               title={direction === "expense" ? "Výdaje" : "Příjmy"}
               rows={direction === "expense" ? expenses : incomes}
               allRows={view.data.rows.filter((r) => r.direction === direction)}
-              categories={categoriesOf(direction)}
               actions={tableProps}
               sort={sort}
               onSortChange={setSort}
               onAddCategory={addCategory}
-              categoryTypes={categoryTypes.data ?? []}
-              categoryTypeOf={categoryTypeOf}
-              onSetCategoryType={setCategoryType}
+              tree={treeOf(direction)}
               onAddPayment={(category) =>
                 setEditing({
                   kind: "oneOff",

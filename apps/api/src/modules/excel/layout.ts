@@ -15,9 +15,8 @@ export const SHEETS = {
   types: "Typy",
 } as const;
 
-/** List „Typy“: druh (nadkategorie / typ platby) a název, v pořadí. */
+/** List „Typy“: druh a název v pořadí (dříve i nadkategorie, ty jsou teď strom kategorií). */
 export const TYPE_KINDS = {
-  category: "Nadkategorie",
   payment: "Typ platby",
 } as const;
 

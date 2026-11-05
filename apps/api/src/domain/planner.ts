@@ -14,6 +14,7 @@ import type {
   PaymentType,
   Template,
 } from "../contracts.ts";
+import { type TreeNode, treeOrder } from "./categoryTree.ts";
 import { itemAsOf } from "./itemChanges.ts";
 import { dueDateIn } from "./month.ts";
 import { isItemDueInMonth } from "./schedule.ts";
@@ -41,10 +42,10 @@ export interface MonthEntryRecord {
   paymentTypeId: number | null;
 }
 
-/** Uložené pořadí a typ kategorie (tabulka categories). */
+/** Uložené pořadí a nadřazená kategorie (tabulka categories). */
 export interface CategoryRecord extends CategoryRef {
   sortOrder: number;
-  typeId: number | null;
+  parent: string | null;
 }
 
 export interface PlannerCatalog {
@@ -88,21 +89,36 @@ export const categoryKey = (direction: Direction, name: string) =>
   `${direction}|${name}`;
 
 /** Pořadí kategorií: nejdřív uložené (přetažené), pak další podle pořadí položek. */
+/**
+ * Strom kategorií směru: uložené (i prázdné, s nadřazenými) v pořadí, pak
+ * další používané (podle položek, pak `extra`) na nejvyšší úrovni.
+ */
+function categoryTreeOf(
+  catalog: PlannerCatalog,
+  direction: Direction,
+  extra: string[] = [],
+) {
+  const nodes: TreeNode[] = [
+    ...[...catalog.categories]
+      .filter((c) => c.direction === direction)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(({ name, parent }) => ({ name, parent })),
+    ...[...catalog.items]
+      .filter((item) => item.direction === direction)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((item) => ({ name: item.category, parent: null })),
+    ...extra.map((name) => ({ name, parent: null })),
+  ];
+  return treeOrder(nodes);
+}
+
+/** Pořadí kategorií podle stromu (nadřazená před podkategoriemi). */
 function rankCategories(catalog: PlannerCatalog): Map<string, number> {
   const rank = new Map<string, number>();
-  const add = (direction: Direction, name: string) => {
-    const key = categoryKey(direction, name);
-    if (!rank.has(key)) rank.set(key, rank.size);
-  };
-  for (const category of [...catalog.categories].sort(
-    (a, b) => a.sortOrder - b.sortOrder,
-  )) {
-    add(category.direction, category.name);
-  }
-  for (const item of [...catalog.items].sort(
-    (a, b) => a.sortOrder - b.sortOrder,
-  )) {
-    add(item.direction, item.category);
+  for (const direction of DIRECTION_ORDER) {
+    for (const node of categoryTreeOf(catalog, direction)) {
+      rank.set(categoryKey(direction, node.name), rank.size);
+    }
   }
   return rank;
 }
@@ -340,36 +356,29 @@ export function monthCategories(
   index: CatalogIndex,
   rows: MonthRow[],
 ): CategoryInfo[] {
-  const seen = new Map<string, CategoryInfo>();
-  const typeOf = new Map(
-    index.catalog.categories.map((c) => [
-      categoryKey(c.direction, c.name),
-      c.typeId,
-    ]),
-  );
-  const add = (direction: Direction, name: string) => {
-    const key = categoryKey(direction, name);
-    if (!seen.has(key)) {
-      seen.set(key, { direction, name, typeId: typeOf.get(key) ?? null });
-    }
-  };
-  for (const category of index.catalog.categories) {
-    add(category.direction, category.name);
-  }
-  for (const item of index.catalog.items.filter((item) => item.active)) {
-    add(item.direction, item.category);
-  }
-  for (const row of rows) add(row.direction, row.category);
-  const rankOf = (c: CategoryInfo) =>
-    index.categoryRank.get(categoryKey(c.direction, c.name)) ??
-    Number.MAX_SAFE_INTEGER;
-  return [...seen.values()].sort(
-    (a, b) =>
-      DIRECTION_ORDER.indexOf(a.direction) -
-        DIRECTION_ORDER.indexOf(b.direction) ||
-      rankOf(a) - rankOf(b) ||
-      a.name.localeCompare(b.name, "cs", { numeric: true }),
-  );
+  return DIRECTION_ORDER.flatMap((direction) => {
+    const oneOffCategories = rows
+      .filter((row) => row.direction === direction)
+      .map((row) => row.category)
+      .sort((a, b) => a.localeCompare(b, "cs", { numeric: true }));
+    const inactive = new Set(
+      index.catalog.items
+        .filter((item) => item.direction === direction && !item.active)
+        .map((item) => item.category),
+    );
+    const used = new Set([
+      ...index.catalog.items
+        .filter((item) => item.direction === direction && item.active)
+        .map((item) => item.category),
+      ...oneOffCategories,
+      ...index.catalog.categories
+        .filter((c) => c.direction === direction)
+        .map((c) => c.name),
+    ]);
+    return categoryTreeOf(index.catalog, direction, oneOffCategories)
+      .filter((node) => used.has(node.name) || !inactive.has(node.name))
+      .map(({ name, parent }) => ({ direction, name, parent }));
+  });
 }
 
 /** Řádky měsíce: aktivní položky (i nesplatné, s částkou 0), položky se záznamem a jednorázové platby. */

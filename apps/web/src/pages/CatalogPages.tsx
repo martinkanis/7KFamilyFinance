@@ -327,8 +327,8 @@ export function TemplatesPage() {
   return <CrudPage config={templatesConfig(counterparties.data ?? [])} />;
 }
 
-/** Číselník typů (nadkategorie / typy plateb): název a pořadí. */
-function typesConfig<R extends "category-types" | "payment-types">(
+/** Číselník typů: název a pořadí. */
+function typesConfig<R extends "payment-types">(
   resource: R,
   texts: {
     title: string;
@@ -362,14 +362,6 @@ function typesConfig<R extends "category-types" | "payment-types">(
   } as CrudConfig<R>;
 }
 
-const categoryTypesConfig = typesConfig("category-types", {
-  title: "Nadkategorie",
-  singular: "Nadkategorie",
-  accusative: "nadkategorii",
-  description:
-    "Skupiny nad kategoriemi – např. Investiční nemovitosti, Osobní spotřeba, Půjčky a pojistky. Kategorii ji přiřadíš v záhlaví kategorie na stránce měsíce.",
-});
-
 const paymentTypesConfig = typesConfig("payment-types", {
   title: "Typy plateb",
   singular: "Typ platby",
@@ -377,10 +369,6 @@ const paymentTypesConfig = typesConfig("payment-types", {
   description:
     "Druh platby – např. Energie – elektřina, Nájmy, Hypotéky, Úvěry & půjčky. Platbě ho přiřadíš v měsíci nebo v Položkách.",
 });
-
-export function CategoryTypesPage() {
-  return <CrudPage config={categoryTypesConfig} />;
-}
 
 export function PaymentTypesPage() {
   return <CrudPage config={paymentTypesConfig} />;

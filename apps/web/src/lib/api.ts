@@ -4,12 +4,10 @@ import type {
   ApiErrorBody,
   BalanceInput,
   CategoryDelete,
-  CategoryOrder,
   CategoryRef,
   CategoryRename,
   CategoryRenameResult,
-  CategoryType,
-  CategoryTypeAssign,
+  CategoryTree,
   Counterparty,
   CurrentUser,
   ExcelBalanceAssignment,
@@ -78,7 +76,6 @@ export interface Resources {
   templates: Template;
   insurance: InsurancePolicy;
   items: ItemWithChanges;
-  "category-types": CategoryType;
   "payment-types": PaymentType;
 }
 
@@ -110,12 +107,10 @@ export const api = {
     ),
   addCategory: (category: CategoryRef) =>
     request<{ ok: boolean }>("POST", "/api/categories", category),
-  orderCategories: (order: CategoryOrder) =>
-    request<{ ok: boolean }>("PUT", "/api/categories/order", order),
+  saveCategoryTree: (tree: CategoryTree) =>
+    request<{ ok: boolean }>("PUT", "/api/categories/tree", tree),
   deleteCategory: (input: CategoryDelete) =>
     request<{ ok: boolean }>("POST", "/api/categories/delete", input),
-  setCategoryType: (input: CategoryTypeAssign) =>
-    request<{ ok: boolean }>("PUT", "/api/categories/type", input),
   reorderRows: (month: string, order: RowOrder) =>
     request<MonthView>("PUT", `/api/months/${month}/order`, order),
   renameCategory: (rename: CategoryRename) =>

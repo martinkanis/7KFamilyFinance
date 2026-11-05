@@ -96,16 +96,14 @@ export type ItemRename = Partial<
   Pick<Item, "name" | "category" | "paymentTypeId">
 >;
 
-/** Typ kategorie a typ platby – vlastní seznamy. */
-export interface CategoryType {
+/** Typ platby – vlastní seznam (Energie – elektřina, Nájmy…). */
+export interface PaymentType {
   id: number;
   name: string;
   sortOrder: number;
 }
 
-export type PaymentType = CategoryType;
-export type CategoryTypeInput = Omit<CategoryType, "id">;
-export type PaymentTypeInput = CategoryTypeInput;
+export type PaymentTypeInput = Omit<PaymentType, "id">;
 
 /** Přejmenuje kategorii u položek i jednorázových plateb ve všech měsících. */
 export interface CategoryRename {
@@ -279,14 +277,9 @@ export interface CategoryRef {
   name: string;
 }
 
-/** Kategorie v měsíci včetně jejího typu (null = bez typu). */
+/** Kategorie v měsíci ve stromu: nadřazená kategorie (null = nejvyšší úroveň). */
 export interface CategoryInfo extends CategoryRef {
-  typeId: number | null;
-}
-
-/** Typ kategorie; null typ odebere. */
-export interface CategoryTypeAssign extends CategoryRef {
-  typeId: number | null;
+  parent: string | null;
 }
 
 /** Nová pozice plateb v kategorii (přetažení); přesunuté platby změní kategorii. */
@@ -294,10 +287,10 @@ export interface RowOrder extends CategoryRef {
   rows: { kind: "item" | "oneOff"; id: number }[];
 }
 
-/** Pořadí kategorií jednoho směru (přetažení). */
-export interface CategoryOrder {
+/** Strom kategorií jednoho směru v pořadí (přetažení). */
+export interface CategoryTree {
   direction: Direction;
-  names: string[];
+  nodes: { name: string; parent: string | null }[];
 }
 
 /** Smazání kategorie; platby z ní se přesunou do `moveTo` (u prázdné null). */

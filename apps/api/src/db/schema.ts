@@ -130,13 +130,6 @@ export const items = pgTable(
   ],
 );
 
-/** Typ kategorie (vlastní seznam): Investiční nemovitosti, Osobní spotřeba… */
-export const categoryTypes = pgTable("category_types", {
-  id: serial().primaryKey(),
-  name: text().notNull().unique(),
-  sortOrder: integer().notNull().default(0),
-});
-
 /** Typ platby (vlastní seznam): Energie – elektřina, Nájmy, Hypotéky… */
 export const paymentTypes = pgTable("payment_types", {
   id: serial().primaryKey(),
@@ -155,9 +148,8 @@ export const categories = pgTable(
     direction: directionEnum().notNull(),
     name: text().notNull(),
     sortOrder: integer().notNull().default(0),
-    typeId: integer().references(() => categoryTypes.id, {
-      onDelete: "set null",
-    }),
+    /** Nadřazená kategorie stejného směru (název); null = nejvyšší úroveň. */
+    parent: text(),
   },
   (table) => [
     uniqueIndex("categories_direction_name").on(table.direction, table.name),

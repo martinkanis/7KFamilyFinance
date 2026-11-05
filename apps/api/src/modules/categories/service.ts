@@ -2,12 +2,13 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type {
   CategoryDelete,
   CategoryRef,
-  CategoryTypeAssign,
+  CategoryTree,
   Direction,
   RowOrder,
 } from "../../contracts.ts";
 import { db, type Executor } from "../../db/index.ts";
 import { categories, items, monthEntries } from "../../db/schema.ts";
+import { type TreeNode, treeOrder } from "../../domain/categoryTree.ts";
 import { invalidInput } from "../../lib/errors.ts";
 
 const DIRECTIONS: Direction[] = ["expense", "income"];
@@ -38,96 +39,75 @@ async function usedCategories(
   return [...new Set(names)];
 }
 
-/** Kategorie směru v zobrazeném pořadí: uložené (i prázdné), pak ostatní používané. */
-async function knownCategories(
+/**
+ * Strom kategorií směru v zobrazeném pořadí: uložené (i prázdné, s nadřazenými),
+ * pak ostatní používané na nejvyšší úrovni.
+ */
+async function knownTree(
   executor: Executor,
   direction: Direction,
-): Promise<string[]> {
+): Promise<TreeNode[]> {
   const stored = await executor
-    .select({ name: categories.name })
+    .select({ name: categories.name, parent: categories.parent })
     .from(categories)
     .where(eq(categories.direction, direction))
     .orderBy(asc(categories.sortOrder));
-  return [
-    ...new Set([
-      ...stored.map((row) => row.name),
-      ...(await usedCategories(executor, direction)),
-    ]),
-  ];
+  const used = await usedCategories(executor, direction);
+  return treeOrder([
+    ...stored,
+    ...used.map((name) => ({ name, parent: null })),
+  ]).map(({ name, parent }) => ({ name, parent }));
 }
 
 /**
- * Uloží pořadí kategorií směru přesně podle `names`; používané kategorie,
- * které v něm chybí, přijdou na konec (žádná platba tak nezmizí z pohledu).
+ * Uloží strom kategorií směru v pořadí `nodes`; používané kategorie, které
+ * v něm chybí, přijdou na konec (žádná platba tak nezmizí z pohledu).
  */
-async function saveCategoryOrder(
+async function saveCategoryTree(
   executor: Executor,
   direction: Direction,
-  names: string[],
+  nodes: TreeNode[],
 ): Promise<string[]> {
   const used = await usedCategories(executor, direction);
-  const ordered = [...new Set([...names, ...used])];
-  // Nadkategorie zůstane kategorii i po přeuložení pořadí.
-  const stored = await executor
-    .select({ name: categories.name, typeId: categories.typeId })
-    .from(categories)
-    .where(eq(categories.direction, direction));
-  const typeOf = new Map(stored.map((row) => [row.name, row.typeId]));
+  const ordered = treeOrder([
+    ...nodes,
+    ...used.map((name) => ({ name, parent: null })),
+  ]);
   await executor.delete(categories).where(eq(categories.direction, direction));
   if (ordered.length > 0) {
     await executor.insert(categories).values(
-      ordered.map((name, index) => ({
+      ordered.map((node, index) => ({
         direction,
-        name,
+        name: node.name,
+        parent: node.parent,
         sortOrder: index + 1,
-        typeId: typeOf.get(name) ?? null,
       })),
     );
   }
-  return ordered;
+  return ordered.map((node) => node.name);
 }
 
-/** Nadkategorie kategorie (null ji odebere); kategorie se uloží do pořadí, pokud tam není. */
-export function setCategoryType({
-  direction,
-  name,
-  typeId,
-}: CategoryTypeAssign): Promise<void> {
+/** Nové pořadí a vnoření kategorií po přetažení. */
+export function saveTree({ direction, nodes }: CategoryTree): Promise<void> {
   return db.transaction(async (tx) => {
-    const known = await knownCategories(tx, direction);
-    if (!known.includes(name)) {
-      throw invalidInput(`Kategorie „${name}“ neexistuje`);
-    }
-    await saveCategoryOrder(tx, direction, known);
-    await tx
-      .update(categories)
-      .set({ typeId })
-      .where(
-        and(eq(categories.direction, direction), eq(categories.name, name)),
-      );
-  });
-}
-
-export function orderCategories(
-  direction: Direction,
-  names: string[],
-): Promise<void> {
-  return db.transaction(async (tx) => {
-    await saveCategoryOrder(tx, direction, names);
+    await saveCategoryTree(tx, direction, nodes);
   });
 }
 
 export function addCategory({ direction, name }: CategoryRef): Promise<void> {
   return db.transaction(async (tx) => {
-    const known = await knownCategories(tx, direction);
-    if (known.includes(name)) {
+    const known = await knownTree(tx, direction);
+    if (known.some((node) => node.name === name)) {
       throw invalidInput(`Kategorie „${name}“ už existuje`);
     }
-    await saveCategoryOrder(tx, direction, [...known, name]);
+    await saveCategoryTree(tx, direction, [...known, { name, parent: null }]);
   });
 }
 
-/** Smaže kategorii; platby z ní (ve všech měsících) přesune do `moveTo`. */
+/**
+ * Smaže kategorii; platby z ní (ve všech měsících) přesune do `moveTo`.
+ * Její podkategorie se posunou o úroveň výš.
+ */
 export function deleteCategory({
   direction,
   name,
@@ -147,7 +127,7 @@ export function deleteCategory({
       tx.select({ id: items.id }).from(items).where(inItems),
       tx.select({ id: monthEntries.id }).from(monthEntries).where(inOneOffs),
     ]);
-    const known = await knownCategories(tx, direction);
+    const known = await knownTree(tx, direction);
     if (itemRows.length + oneOffRows.length > 0) {
       if (moveTo == null || moveTo === name) {
         throw invalidInput(
@@ -157,44 +137,39 @@ export function deleteCategory({
       await tx.update(items).set({ category: moveTo }).where(inItems);
       await tx.update(monthEntries).set({ category: moveTo }).where(inOneOffs);
     }
-    await saveCategoryOrder(
+    const parentOfDeleted =
+      known.find((node) => node.name === name)?.parent ?? null;
+    await saveCategoryTree(
       tx,
       direction,
-      known.filter((category) => category !== name),
+      known
+        .filter((node) => node.name !== name)
+        .map((node) =>
+          node.parent === name ? { ...node, parent: parentOfDeleted } : node,
+        ),
     );
   });
 }
 
-/** Přejmenování kategorie v uloženém pořadí (stejný název už existuje → sloučí se). */
+/**
+ * Přejmenování kategorie ve stromu: nese si nadřazenou i podkategorie
+ * (stejný název už existuje → kategorie se sloučí).
+ */
 export async function renameStoredCategory(
   executor: Executor,
   direction: Direction,
   from: string,
   to: string,
 ): Promise<void> {
-  const known = await knownCategories(executor, direction);
-  // Přejmenovaná kategorie si nechá nadkategorii (pokud cílová žádnou nemá).
-  const typeOf = async (name: string) =>
-    (
-      await executor
-        .select({ typeId: categories.typeId })
-        .from(categories)
-        .where(
-          and(eq(categories.direction, direction), eq(categories.name, name)),
-        )
-    )[0]?.typeId ?? null;
-  const fromType = await typeOf(from);
-  await saveCategoryOrder(
+  const known = await knownTree(executor, direction);
+  await saveCategoryTree(
     executor,
     direction,
-    known.map((name) => (name === from ? to : name)),
+    known.map((node) => ({
+      name: node.name === from ? to : node.name,
+      parent: node.parent === from ? to : node.parent,
+    })),
   );
-  if (fromType != null && (await typeOf(to)) == null) {
-    await executor
-      .update(categories)
-      .set({ typeId: fromType })
-      .where(and(eq(categories.direction, direction), eq(categories.name, to)));
-  }
 }
 
 /**
@@ -242,10 +217,10 @@ async function renumberItems(
 ): Promise<void> {
   const ranks = new Map<string, number>();
   for (const dir of DIRECTIONS) {
-    const names = await saveCategoryOrder(
+    const names = await saveCategoryTree(
       executor,
       dir,
-      await knownCategories(executor, dir),
+      await knownTree(executor, dir),
     );
     for (const [index, name] of names.entries()) {
       ranks.set(`${dir}|${name}`, index);

@@ -15,6 +15,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import type { TreeDrop } from "@kkff/api/categoryTree";
 import type { MonthRow } from "@kkff/api/contracts";
 import { GripVertical } from "lucide-react";
 import {
@@ -35,12 +36,19 @@ export type DragData =
   | { type: "row"; row: MonthRow }
   | { type: "category"; category: string };
 
-/** Cíl puštění: řádek (před/za), záhlaví kategorie (před/za; řádek jde na začátek). */
+/**
+ * Cíl puštění: řádek (před/za), záhlaví kategorie – platba jde na začátek
+ * kategorie, kategorie před/za ni, nebo prostředkem do ní (podkategorie).
+ */
 export interface DropTarget {
   id: string;
   data: DragData;
   after: boolean;
+  zone: TreeDrop;
 }
+
+/** Okraj záhlaví (podíl výšky), na kterém se kategorie položí před/za, ne do. */
+const EDGE = 0.3;
 
 export const rowDndId = (row: MonthRow) => `row:${row.key}`;
 export const categoryDndId = (category: string) => `cat:${category}`;
@@ -96,11 +104,21 @@ function targetOf(event: DragMoveEvent | DragEndEvent): DropTarget | null {
   if (!over || over.id === active.id) return null;
   const dragged = active.rect.current.translated;
   const middle = dragged ? dragged.top + dragged.height / 2 : 0;
-  return {
-    id: String(over.id),
-    data: over.data.current as DragData,
-    after: middle > over.rect.top + over.rect.height / 2,
-  };
+  const position = (middle - over.rect.top) / Math.max(over.rect.height, 1);
+  const data = over.data.current as DragData;
+  const nesting =
+    (active.data.current as DragData | undefined)?.type === "category" &&
+    data.type === "category";
+  const zone: TreeDrop = nesting
+    ? position < EDGE
+      ? "before"
+      : position > 1 - EDGE
+        ? "after"
+        : "into"
+    : position > 0.5
+      ? "after"
+      : "before";
+  return { id: String(over.id), data, after: zone === "after", zone };
 }
 
 export function MonthDnd({
@@ -201,9 +219,7 @@ export function useDndItem(
       ? null
       : data.type === "category" && dragging?.type === "row"
         ? ("into" as const)
-        : target.after
-          ? ("after" as const)
-          : ("before" as const),
+        : target.zone,
   };
 }
 

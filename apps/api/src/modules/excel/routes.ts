@@ -3,7 +3,7 @@ import { Elysia, t } from "elysia";
 import { config } from "../../config.ts";
 import type { ImportResult } from "../../contracts.ts";
 import { db } from "../../db/index.ts";
-import { categoryTypes, insurancePolicies } from "../../db/schema.ts";
+import { insurancePolicies } from "../../db/schema.ts";
 import { invalidInput } from "../../lib/errors.ts";
 import { todayInPrague } from "../../lib/today.ts";
 import { computePlanSnapshot } from "../overview/service.ts";
@@ -15,16 +15,11 @@ const XLSX_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 async function exportWorkbook(): Promise<Response> {
-  const [snapshot, insurance, categoryTypeRows] = await Promise.all([
+  const [snapshot, insurance] = await Promise.all([
     computePlanSnapshot(),
     db.select().from(insurancePolicies).orderBy(asc(insurancePolicies.id)),
-    db.select().from(categoryTypes).orderBy(asc(categoryTypes.sortOrder)),
   ]);
-  const workbook = buildExportWorkbook({
-    ...snapshot,
-    insurance,
-    categoryTypes: categoryTypeRows,
-  });
+  const workbook = buildExportWorkbook({ ...snapshot, insurance });
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = `7KFamilyFinance-${todayInPrague()}.xlsx`;
   return new Response(buffer, {

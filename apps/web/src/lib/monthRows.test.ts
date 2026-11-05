@@ -4,7 +4,6 @@ import {
   copyOf,
   dueDateIn,
   groupByCategory,
-  moveCategory,
   moveRow,
   rowWithChanges,
   sortRows,
@@ -208,20 +207,6 @@ describe("přetahování", () => {
     });
     expect(result?.rows.at(-1)).toMatchObject({ key: "e9", category: "Nová" });
     expect(result?.categoryRows).toEqual([{ kind: "oneOff", id: 9 }]);
-  });
-
-  it("přesune kategorii před i za jinou", () => {
-    expect(moveCategory(["A", "B", "C"], "A", "C", true)).toEqual([
-      "B",
-      "C",
-      "A",
-    ]);
-    expect(moveCategory(["A", "B", "C"], "C", "A", false)).toEqual([
-      "C",
-      "A",
-      "B",
-    ]);
-    expect(moveCategory(["A", "B"], "A", "A", false)).toBeNull();
   });
 });
 

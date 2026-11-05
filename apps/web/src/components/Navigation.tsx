@@ -5,7 +5,6 @@ import {
   CalendarDays,
   ChartLine,
   FileSpreadsheet,
-  FolderTree,
   Landmark,
   ListChecks,
   LogOut,
@@ -35,7 +34,6 @@ const MORE_LINKS = [
   { to: "/protistrany", label: "Protistrany", icon: Users },
   { to: "/sablony", label: "Šablony", icon: BookCopy },
   { to: "/pojistky", label: "Pojistky", icon: ShieldCheck },
-  { to: "/nadkategorie", label: "Nadkategorie", icon: FolderTree },
   { to: "/typy-plateb", label: "Typy plateb", icon: Tags },
   { to: "/data", label: "Excel", icon: FileSpreadsheet },
 ] as const;

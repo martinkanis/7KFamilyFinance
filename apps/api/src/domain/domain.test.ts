@@ -149,8 +149,13 @@ describe("pořadí kategorií a plateb", () => {
       catalog({
         items,
         categories: [
-          { direction: "expense", name: "Auto", sortOrder: 1, typeId: 7 },
-          { direction: "expense", name: "Prázdná", sortOrder: 2, typeId: null },
+          { direction: "expense", name: "Auto", sortOrder: 1, parent: null },
+          {
+            direction: "expense",
+            name: "Prázdná",
+            sortOrder: 2,
+            parent: "Auto",
+          },
         ],
       }),
     );
@@ -159,10 +164,10 @@ describe("pořadí kategorií a plateb", () => {
       "Auto",
       "Bydlení",
     ]);
-    expect(monthCategories(index, rows).map((c) => [c.name, c.typeId])).toEqual(
+    expect(monthCategories(index, rows).map((c) => [c.name, c.parent])).toEqual(
       [
-        ["Auto", 7],
-        ["Prázdná", null],
+        ["Auto", null],
+        ["Prázdná", "Auto"],
         ["Bydlení", null],
       ],
     );

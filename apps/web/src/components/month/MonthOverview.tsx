@@ -1,7 +1,8 @@
+import { rootOf, type TreeNode } from "@kkff/api/categoryTree";
 import type {
-  CategoryType,
   Direction,
   DirectionSummary,
+  MonthRow,
   MonthView,
   PaymentType,
 } from "@kkff/api/contracts";
@@ -14,7 +15,7 @@ import {
   sharesOf,
 } from "@/components/ui/breakdown";
 import { Card } from "@/components/ui/card";
-import { categoryNumber, numberedCategory } from "@/lib/categoryNumbers";
+import { numberedCategory, treeNumbers } from "@/lib/categoryNumbers";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
 import {
@@ -174,24 +175,40 @@ function BalanceStat({ view }: { view: MonthView }) {
   );
 }
 
-/** Rozpad směru podle kategorií s čísly kategorií jako v tabulce. */
+function treeOf(view: MonthView, direction: Direction): TreeNode[] {
+  return view.categories
+    .filter((c) => c.direction === direction)
+    .map(({ name, parent }) => ({ name, parent }));
+}
+
+/**
+ * Rozpad směru podle kategorií s čísly kategorií jako v tabulce; `roots`
+ * sečte podkategorie do jejich kategorie nejvyšší úrovně.
+ */
 function numberedBreakdown(
   view: MonthView,
   direction: Direction,
   previous: MonthView | undefined,
+  roots = false,
 ): CategorySegment[] {
-  const categoryNames = view.categories
-    .filter((c) => c.direction === direction)
-    .map((c) => c.name);
-  return categoryBreakdown(view.rows, direction, previous?.rows ?? null).map(
-    (segment) => ({
-      ...segment,
-      label: numberedCategory(
-        segment.label,
-        categoryNumber(categoryNames, segment.key),
-      ),
-    }),
-  );
+  const tree = treeOf(view, direction);
+  const numbers = treeNumbers(tree);
+  const grouped = (rows: MonthRow[]) =>
+    roots
+      ? rows.map((row) =>
+          row.direction === direction
+            ? { ...row, category: rootOf(tree, row.category) }
+            : row,
+        )
+      : rows;
+  return categoryBreakdown(
+    grouped(view.rows),
+    direction,
+    previous ? grouped(previous.rows) : null,
+  ).map((segment) => ({
+    ...segment,
+    label: numberedCategory(segment.label, numbers.get(segment.key) ?? null),
+  }));
 }
 
 /**
@@ -202,11 +219,9 @@ export function MonthOverview({
   view,
   previous,
   direction,
-  categoryTypes,
   paymentTypes,
 }: {
   view: MonthView;
-  categoryTypes: CategoryType[];
   paymentTypes: PaymentType[];
   /** Minulý měsíc pro porovnání; dokud se nenačte, změny se neukazují. */
   previous: MonthView | undefined;
@@ -307,21 +322,7 @@ export function MonthOverview({
                   "Bez typu platby",
                 );
               }
-              const typeOfCategory = new Map(
-                view.categories.map((c) => [
-                  `${c.direction}|${c.name}`,
-                  c.typeId,
-                ]),
-              );
-              return typeBreakdown(
-                view.rows,
-                d,
-                categoryTypes,
-                (row) =>
-                  typeOfCategory.get(`${row.direction}|${row.category}`) ??
-                  null,
-                "Bez nadkategorie",
-              );
+              return numberedBreakdown(view, d, previous, true);
             }}
           />
         </div>

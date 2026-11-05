@@ -1,6 +1,5 @@
 import type {
   Account,
-  CategoryType,
   EntryInput,
   MonthRow,
   PaymentType,
@@ -90,7 +89,7 @@ export function CategoryName({
 }: Pick<RowEditing, "onRenameCategory" | "onInvalid"> & {
   category: string;
   /** Pořadové číslo kategorie – jen zobrazení, při úpravě se mění samotný název. */
-  number: number | null;
+  number: string | null;
 }) {
   return (
     <EditableText
@@ -329,7 +328,7 @@ export function ReceivedCell({ row, onChange, onInvalid }: CellProps) {
   );
 }
 
-/** Výběr z číselníku typů, který vypadá jako text; prázdná hodnota se nabídne po najetí. */
+/** Výběr typu platby, který vypadá jako text; prázdná hodnota se nabídne po najetí. */
 function TypeSelect({
   label,
   emptyLabel,
@@ -341,7 +340,7 @@ function TypeSelect({
   label: string;
   emptyLabel: string;
   value: number | null;
-  types: CategoryType[];
+  types: PaymentType[];
   shownName: string | null;
   onPick: (typeId: number | null) => void;
 }) {
@@ -385,27 +384,6 @@ export function PaymentTypeCell({
       types={paymentTypes}
       shownName={row.paymentType?.name ?? null}
       onPick={(typeId) => onSetPaymentType(row, typeId)}
-    />
-  );
-}
-
-export function CategoryTypeCell({
-  typeId,
-  categoryTypes,
-  onPick,
-}: {
-  typeId: number | null;
-  categoryTypes: CategoryType[];
-  onPick: (typeId: number | null) => void;
-}) {
-  return (
-    <TypeSelect
-      label="Nadkategorie"
-      emptyLabel="+ nadkategorie"
-      value={typeId}
-      types={categoryTypes}
-      shownName={categoryTypes.find((t) => t.id === typeId)?.name ?? null}
-      onPick={onPick}
     />
   );
 }

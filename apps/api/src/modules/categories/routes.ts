@@ -1,11 +1,6 @@
 import { Elysia, t } from "elysia";
-import { nullableId, requiredText } from "../../lib/schemas.ts";
-import {
-  addCategory,
-  deleteCategory,
-  orderCategories,
-  setCategoryType,
-} from "./service.ts";
+import { requiredText } from "../../lib/schemas.ts";
+import { addCategory, deleteCategory, saveTree } from "./service.ts";
 
 const direction = t.Union([t.Literal("expense"), t.Literal("income")]);
 const categoryName = requiredText();
@@ -20,28 +15,29 @@ export const categoryRoutes = new Elysia({ prefix: "/api/categories" })
     { body: t.Object({ direction, name: categoryName }) },
   )
   .put(
-    "/order",
+    "/tree",
     async ({ body }) => {
-      await orderCategories(
-        body.direction,
-        body.names.map((name) => name.trim()),
-      );
+      await saveTree({
+        direction: body.direction,
+        nodes: body.nodes.map((node) => ({
+          name: node.name.trim(),
+          parent: node.parent?.trim() || null,
+        })),
+      });
       return { ok: true };
     },
     {
       body: t.Object({
         direction,
-        names: t.Array(categoryName, { maxItems: 500 }),
+        nodes: t.Array(
+          t.Object({
+            name: categoryName,
+            parent: t.Union([categoryName, t.Null()]),
+          }),
+          { maxItems: 500 },
+        ),
       }),
     },
-  )
-  .put(
-    "/type",
-    async ({ body }) => {
-      await setCategoryType({ ...body, name: body.name.trim() });
-      return { ok: true };
-    },
-    { body: t.Object({ direction, name: categoryName, typeId: nullableId }) },
   )
   .post(
     "/delete",

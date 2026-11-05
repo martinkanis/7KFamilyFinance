@@ -1,8 +1,8 @@
 import { asc, eq, sql } from "drizzle-orm";
 import { Elysia, t } from "elysia";
-import type { CategoryType } from "../../contracts.ts";
+import type { PaymentType } from "../../contracts.ts";
 import { db } from "../../db/index.ts";
-import { categoryTypes, paymentTypes } from "../../db/schema.ts";
+import { paymentTypes } from "../../db/schema.ts";
 import { notFound, withDbErrors } from "../../lib/errors.ts";
 import { firstOrThrow, normalizeTexts } from "../../lib/normalize.ts";
 import { idParams, requiredText } from "../../lib/schemas.ts";
@@ -12,10 +12,10 @@ const typeBody = t.Object({
   sortOrder: t.Optional(t.Integer()),
 });
 
-/** Číselník typů (nadkategorie, typy plateb): název a pořadí. */
+/** Číselník typů: název a pořadí. */
 function typeRoutes(
   prefix: string,
-  table: typeof categoryTypes | typeof paymentTypes,
+  table: typeof paymentTypes,
   entity: string,
 ) {
   const nextSortOrder = async () => {
@@ -27,12 +27,12 @@ function typeRoutes(
   return new Elysia({ prefix })
     .get(
       "/",
-      (): Promise<CategoryType[]> =>
+      (): Promise<PaymentType[]> =>
         db.select().from(table).orderBy(asc(table.sortOrder), asc(table.name)),
     )
     .post(
       "/",
-      async ({ body }): Promise<CategoryType> => {
+      async ({ body }): Promise<PaymentType> => {
         const values = normalizeTexts(body);
         const sortOrder = values.sortOrder ?? (await nextSortOrder());
         const rows = await withDbErrors(entity, () =>
@@ -47,7 +47,7 @@ function typeRoutes(
     )
     .put(
       "/:id",
-      async ({ params, body }): Promise<CategoryType> => {
+      async ({ params, body }): Promise<PaymentType> => {
         const rows = await withDbErrors(entity, () =>
           db
             .update(table)
@@ -71,12 +71,6 @@ function typeRoutes(
       { params: idParams },
     );
 }
-
-export const categoryTypeRoutes = typeRoutes(
-  "/api/category-types",
-  categoryTypes,
-  "Nadkategorie",
-);
 
 export const paymentTypeRoutes = typeRoutes(
   "/api/payment-types",

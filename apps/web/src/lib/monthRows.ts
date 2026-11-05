@@ -317,21 +317,6 @@ export function moveRow(
   };
 }
 
-/** Nové pořadí kategorií po přetažení `dragged` před/za `target`. */
-export function moveCategory(
-  names: string[],
-  dragged: string,
-  target: string,
-  after: boolean,
-): string[] | null {
-  if (dragged === target) return null;
-  const rest = names.filter((name) => name !== dragged);
-  const index = rest.indexOf(target);
-  if (index < 0) return null;
-  rest.splice(index + (after ? 1 : 0), 0, dragged);
-  return rest;
-}
-
 /** Hodnoty pro kopii platby (stav se nekopíruje – kopie je nezaplacená). */
 export function copyOf(row: MonthRow) {
   return {

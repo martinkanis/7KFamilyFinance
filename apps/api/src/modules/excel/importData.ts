@@ -1,10 +1,9 @@
-import type { ImportResult } from "../../contracts.ts";
+import type { Direction, ImportResult } from "../../contracts.ts";
 import { db, type Transaction } from "../../db/index.ts";
 import {
   accountBalances,
   accounts,
   categories,
-  categoryTypes,
   counterparties,
   insurancePolicies,
   itemChanges,
@@ -58,41 +57,27 @@ async function deleteAll(tx: Transaction): Promise<void> {
   await tx.delete(counterparties);
   await tx.delete(accounts);
   await tx.delete(paymentTypes);
-  await tx.delete(categoryTypes);
 }
 
-/** Typy ze sešitu (i nepoužité z listu „Typy“) a ty, na které se odkazuje. */
+/** Typy plateb ze sešitu (i nepoužité z listu „Typy“) a ty, na které se odkazuje. */
 async function insertTypes(
   tx: Transaction,
   data: ImportData,
-): Promise<{ categoryTypes: IdMap; paymentTypes: IdMap }> {
+): Promise<{ paymentTypes: IdMap }> {
   const unique = (names: (string | null)[]) => [
     ...new Set(names.filter((name): name is string => name != null)),
   ];
-  const categoryTypeNames = unique([
-    ...data.categoryTypes,
-    ...data.categories.map((c) => c.typeName),
-  ]);
   const paymentTypeNames = unique([
     ...data.paymentTypes,
     ...data.items.map((i) => i.paymentTypeName),
     ...data.entries.map((e) => e.paymentTypeName),
   ]);
-  const insert = async (
-    table: typeof categoryTypes | typeof paymentTypes,
-    names: string[],
-  ): Promise<IdMap> => {
-    if (names.length === 0) return new Map();
-    const rows = await tx
-      .insert(table)
-      .values(names.map((name, i) => ({ name, sortOrder: i + 1 })))
-      .returning({ id: table.id, name: table.name });
-    return new Map(rows.map((row) => [row.name, row.id]));
-  };
-  return {
-    categoryTypes: await insert(categoryTypes, categoryTypeNames),
-    paymentTypes: await insert(paymentTypes, paymentTypeNames),
-  };
+  if (paymentTypeNames.length === 0) return { paymentTypes: new Map() };
+  const rows = await tx
+    .insert(paymentTypes)
+    .values(paymentTypeNames.map((name, i) => ({ name, sortOrder: i + 1 })))
+    .returning({ id: paymentTypes.id, name: paymentTypes.name });
+  return { paymentTypes: new Map(rows.map((row) => [row.name, row.id])) };
 }
 
 async function insertTemplates(
@@ -292,6 +277,44 @@ async function insertItemChanges(
   return unique.size;
 }
 
+/**
+ * Strom kategorií ze sešitu. Nadřazená kategorie, která v listu chybí
+ * (např. nadkategorie ze starší zálohy), se založí před svou první podkategorií.
+ */
+async function insertCategoryTree(
+  tx: Transaction,
+  data: ImportData,
+): Promise<void> {
+  const rows: { direction: Direction; name: string; parent: string | null }[] =
+    [];
+  const has = (direction: Direction, name: string) =>
+    rows.some((row) => row.direction === direction && row.name === name) ||
+    data.categories.some(
+      (category) => category.direction === direction && category.name === name,
+    );
+  for (const category of data.categories) {
+    if (category.parent && !has(category.direction, category.parent)) {
+      rows.push({
+        direction: category.direction,
+        name: category.parent,
+        parent: null,
+      });
+    }
+    if (
+      !rows.some(
+        (r) => r.direction === category.direction && r.name === category.name,
+      )
+    ) {
+      rows.push(category);
+    }
+  }
+  if (rows.length > 0) {
+    await tx
+      .insert(categories)
+      .values(rows.map((row, i) => ({ ...row, sortOrder: i + 1 })));
+  }
+}
+
 async function insertBalances(
   tx: Transaction,
   data: ImportData,
@@ -333,20 +356,7 @@ export function replaceAllData(data: ImportData): Promise<ImportResult> {
     );
     const templateIds = await insertTemplates(tx, data, counterpartyIds, refs);
     const typeIds = await insertTypes(tx, data);
-    if (data.categories.length > 0) {
-      await tx.insert(categories).values(
-        data.categories.map((category, i) => ({
-          direction: category.direction,
-          name: category.name,
-          sortOrder: i + 1,
-          typeId: refs.resolve(
-            typeIds.categoryTypes,
-            category.typeName,
-            `Kategorie ${category.name}, nadkategorie`,
-          ),
-        })),
-      );
-    }
+    await insertCategoryTree(tx, data);
     if (data.insurance.length > 0) {
       await tx.insert(insurancePolicies).values(data.insurance);
     }

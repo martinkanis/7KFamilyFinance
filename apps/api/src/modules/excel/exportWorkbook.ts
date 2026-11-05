@@ -2,7 +2,6 @@ import ExcelJS from "exceljs";
 import type {
   AccountBalance,
   CategoryMatrix,
-  CategoryType,
   InsurancePolicy,
   MonthView,
   Overview,
@@ -43,7 +42,6 @@ import {
 export interface ExportInput {
   settings: Settings;
   catalog: PlannerCatalog;
-  categoryTypes: CategoryType[];
   insurance: InsurancePolicy[];
   balances: AccountBalance[];
   overview: Overview;
@@ -530,13 +528,12 @@ function writeItemChangesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
   setColumnWidths(sheet, [11, 10, 13, 9, 22, 21, 11]);
 }
 
-/** Nadkategorie a typy plateb (i nepoužité), v pořadí; jde zpět importovat. */
+/** Typy plateb (i nepoužité), v pořadí; jde zpět importovat. */
 function writeTypesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
   const sheet = wb.addWorksheet(SHEETS.types);
-  writeTitle(sheet, "Nadkategorie a typy plateb");
+  writeTitle(sheet, "Typy plateb");
   writeHeaderRow(sheet, TABLE_HEADER_ROW, ["Druh", "Název"]);
   writeRows(sheet, FIRST_TABLE_ROW, [
-    ...input.categoryTypes.map((t) => [TYPE_KINDS.category, t.name]),
     ...[...input.catalog.paymentTypes]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((t) => [TYPE_KINDS.payment, t.name]),
@@ -544,26 +541,21 @@ function writeTypesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
   setColumnWidths(sheet, [16, 34]);
 }
 
-/** Pořadí kategorií (i prázdných) a jejich nadkategorie; jde zpět importovat. */
+/** Strom kategorií (i prázdných) v pořadí; jde zpět importovat. */
 function writeCategoriesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
   const sheet = wb.addWorksheet(SHEETS.categories);
-  writeTitle(sheet, "Kategorie – pořadí a nadkategorie");
+  writeTitle(sheet, "Kategorie – pořadí a nadřazené kategorie");
   writeHeaderRow(sheet, TABLE_HEADER_ROW, [
     "Směr",
     "Kategorie",
-    "Nadkategorie",
+    "Nadřazená kategorie",
   ]);
-  const typeNames = nameById(input.categoryTypes);
   writeRows(
     sheet,
     FIRST_TABLE_ROW,
     [...input.catalog.categories]
       .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((c) => [
-        DIRECTION_LABELS[c.direction],
-        c.name,
-        c.typeId == null ? null : (typeNames.get(c.typeId) ?? null),
-      ]),
+      .map((c) => [DIRECTION_LABELS[c.direction], c.name, c.parent]),
   );
   setColumnWidths(sheet, [8, 34, 26]);
 }

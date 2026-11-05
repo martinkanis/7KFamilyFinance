@@ -8,7 +8,6 @@ import { AppShell } from "@/components/AppShell";
 import { currentMonth } from "@/lib/format";
 import {
   AccountsPage,
-  CategoryTypesPage,
   CounterpartiesPage,
   InsurancePage,
   PaymentTypesPage,
@@ -51,11 +50,6 @@ const routeTree = rootRoute.addChildren([
   }),
   createRoute({ getParentRoute, path: "/sablony", component: TemplatesPage }),
   createRoute({ getParentRoute, path: "/pojistky", component: InsurancePage }),
-  createRoute({
-    getParentRoute,
-    path: "/nadkategorie",
-    component: CategoryTypesPage,
-  }),
   createRoute({
     getParentRoute,
     path: "/typy-plateb",
