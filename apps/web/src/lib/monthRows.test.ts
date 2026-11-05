@@ -34,6 +34,7 @@ const row: MonthRow = {
   status: "unpaid",
   paidOn: null,
   note: null,
+  receivedAmount: null,
   savings: false,
   overrides: {
     amount: null,
@@ -241,5 +242,15 @@ describe("duplikování platby", () => {
       recurring: true,
     });
     expect(copyOf({ ...row, isOneOff: true }).recurring).toBe(false);
+  });
+});
+
+describe("částečné plnění", () => {
+  it("do zbývající částky kategorie se počítá jen nepřijatá část", () => {
+    const [group] = groupByCategory([
+      { ...row, amount: 41000, receivedAmount: 20000 },
+      { ...row, key: "x", amount: 1000, status: "paid", receivedAmount: 300 },
+    ]);
+    expect(group).toMatchObject({ plan: 42000, remaining: 21000 });
   });
 });

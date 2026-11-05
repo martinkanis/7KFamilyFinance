@@ -204,6 +204,8 @@ export const monthEntries = pgTable(
     afterItemId: integer().references(() => items.id, { onDelete: "set null" }),
     /** Pořadí jednorázové platby; null = ještě nepřesunutá, je na konci kategorie. */
     sortOrder: integer(),
+    /** Částečné plnění: kolik už přišlo/odešlo, dokud platba není celá. */
+    receivedAmount: money(),
   },
   (table) => [
     uniqueIndex("month_entries_month_item").on(table.month, table.itemId),

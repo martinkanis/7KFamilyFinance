@@ -19,9 +19,16 @@ export function entryInputOf(
     status: row.status,
     paidOn: row.paidOn,
     note: row.note,
+    receivedAmount: row.receivedAmount,
     ...row.overrides,
     ...changes,
   };
+}
+
+/** Kolik z platby už je vyřízeno: zaplacená celá, jinak částečně přijatá část (jako server). */
+export function settledAmount(row: MonthRow): number {
+  if (row.status === "paid") return row.amount;
+  return Math.min(Math.max(row.receivedAmount ?? 0, 0), row.amount);
 }
 
 export function oneOffInputOf(
@@ -111,9 +118,7 @@ export function groupByCategory(
     }
     group.rows.push(row);
     group.plan += row.amount;
-    if (row.status !== "paid") {
-      group.remaining += row.amount;
-    }
+    group.remaining += row.amount - settledAmount(row);
   }
   return groups;
 }
@@ -129,6 +134,7 @@ export function withOptimisticStatus(
     ...row,
     status,
     paidOn: status === "paid" ? today : null,
+    receivedAmount: status === "paid" ? null : row.receivedAmount,
   }));
 }
 
@@ -178,6 +184,11 @@ export function rowWithChanges(
         : row.ourAccount,
     note: changes.note === undefined ? row.note : changes.note,
     paidOn: changes.paidOn === undefined ? row.paidOn : changes.paidOn,
+    status: changes.status ?? row.status,
+    receivedAmount:
+      changes.receivedAmount === undefined
+        ? row.receivedAmount
+        : changes.receivedAmount,
   };
 }
 

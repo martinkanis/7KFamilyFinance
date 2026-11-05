@@ -102,6 +102,30 @@ describe("splatnost položky", () => {
   });
 });
 
+describe("částečné plnění", () => {
+  it("souhrny počítají jen přijatou část, celá platba ji přebije", () => {
+    const index = indexCatalog(
+      catalog({
+        items: [
+          makeItem({ id: 1, direction: "income", amount: 41000 }),
+          makeItem({ id: 2, code: "P2", direction: "income", amount: 1000 }),
+        ],
+      }),
+    );
+    const rows = buildMonthRows("2026-11", index, [
+      makeEntry({ id: 1, itemId: 1, receivedAmount: 20000 }),
+      makeEntry({ id: 2, itemId: 2, status: "paid", receivedAmount: 300 }),
+    ]);
+    expect(summarizeMonth(rows).income).toEqual({
+      plan: 42000,
+      paid: 21000,
+      processing: 0,
+      remaining: 21000,
+    });
+    expect(breakdownByAccount(rows, [])[0]?.incomeRemaining).toBe(21000);
+  });
+});
+
 describe("pořadí kategorií a plateb", () => {
   const items = [
     makeItem({ id: 1, code: "V01", category: "Bydlení", sortOrder: 1 }),

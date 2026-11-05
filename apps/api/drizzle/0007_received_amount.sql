@@ -1,0 +1,1 @@
+ALTER TABLE "month_entries" ADD COLUMN "received_amount" numeric(14, 2);

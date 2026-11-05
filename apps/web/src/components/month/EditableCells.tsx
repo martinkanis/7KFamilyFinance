@@ -259,3 +259,47 @@ export function PaidOnCell({ row, onChange }: CellProps) {
     </EditableText>
   );
 }
+
+/**
+ * Částečné plnění příjmu: kolik zatím přišlo. Celá částka (nebo víc)
+ * platbu rovnou označí jako přijatou.
+ */
+export function ReceivedCell({ row, onChange, onInvalid }: CellProps) {
+  if (row.direction !== "income" || row.status === "paid" || row.amount === 0) {
+    return null;
+  }
+  const received = row.receivedAmount;
+  return (
+    <span className={cn("text-xs", received == null && REVEAL_ON_ROW)}>
+      <EditableText
+        value={toText(received)}
+        label="Přišlo zatím (částečně)"
+        placeholder="+ přišlo částečně"
+        inputMode="decimal"
+        onCommit={(text) => {
+          const parsed = parseOptionalNumber(text, "Přišlo zatím");
+          if (!parsed.ok) {
+            onInvalid(parsed.error);
+          } else if (parsed.value != null && parsed.value >= row.amount) {
+            onChange(row, {
+              status: "paid",
+              paidOn: null,
+              receivedAmount: null,
+            });
+          } else {
+            const value = parsed.value;
+            onChange(row, {
+              receivedAmount: value && value > 0 ? value : null,
+            });
+          }
+        }}
+      >
+        {received != null && (
+          <span className="font-medium text-emerald-700">
+            přišlo {formatMoney(received)} z {formatMoney(row.amount)}
+          </span>
+        )}
+      </EditableText>
+    </span>
+  );
+}

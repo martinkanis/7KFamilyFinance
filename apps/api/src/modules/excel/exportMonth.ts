@@ -63,6 +63,7 @@ const MONTH_HEADERS = [
   "",
   "Směr",
   "Kategorie",
+  "Částečně přišlo",
 ];
 
 const VISIBLE_WIDTH = 12;
@@ -173,6 +174,7 @@ function writePaymentRow(
     [C.overrideVs, overrides.vs],
     [C.direction, DIRECTION_LABELS[payment.direction]],
     [C.category, payment.category],
+    [C.receivedAmount, payment.receivedAmount],
   ];
   for (const [column, value] of values) {
     row.getCell(column).value = value;
@@ -187,7 +189,7 @@ function writePaymentRow(
   for (const column of [C.dueDate, C.paidOn]) {
     row.getCell(column).numFmt = DATE_FORMAT;
   }
-  for (const column of [C.amount, C.overrideAmount]) {
+  for (const column of [C.amount, C.overrideAmount, C.receivedAmount]) {
     row.getCell(column).numFmt = MONEY_FORMAT;
   }
 }

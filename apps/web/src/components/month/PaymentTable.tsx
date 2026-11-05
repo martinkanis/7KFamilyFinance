@@ -25,6 +25,7 @@ import {
   DueCell,
   NameCell,
   PaidOnCell,
+  ReceivedCell,
   type RowEditing,
 } from "./EditableCells";
 import {
@@ -233,6 +234,9 @@ function PaymentRow({
             <PaidOnCell {...cell} />
           </div>
         )}
+        <div className="mt-1">
+          <ReceivedCell {...cell} />
+        </div>
       </td>
       <td className="py-2 pr-4 pl-2 text-right align-top whitespace-nowrap">
         <RowButtons row={row} onEdit={onEdit} onQr={onQr} />
@@ -312,6 +316,7 @@ function PaymentCard({
                 <PaidOnCell {...cell} />
               </span>
             )}
+            <ReceivedCell {...cell} />
           </div>
         </div>
         <div className="shrink-0 text-right">

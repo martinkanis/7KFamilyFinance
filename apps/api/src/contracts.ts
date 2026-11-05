@@ -175,6 +175,8 @@ export interface EntryInput extends MonthOverrides {
   status: PaymentStatus;
   paidOn: string | null;
   note: string | null;
+  /** Částečné plnění (zatím přišlo); u celé platby null. */
+  receivedAmount?: number | null;
 }
 
 /** Uložení položky v měsíci; `promote` = hodnoty, které mají platit i v dalších měsících. */
@@ -218,6 +220,8 @@ export interface MonthRow {
   status: PaymentStatus;
   paidOn: string | null;
   note: string | null;
+  /** Kolik už z platby přišlo, dokud není celá (částečné plnění). */
+  receivedAmount: number | null;
   savings: boolean;
   overrides: MonthOverrides;
 }

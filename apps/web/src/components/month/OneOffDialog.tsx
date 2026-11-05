@@ -68,6 +68,7 @@ function initialForm(row: MonthRow | null, preset?: PaymentPreset) {
     status: row?.status ?? ("unpaid" as PaymentStatus),
     paidOn: toText(row?.paidOn),
     note: toText(row?.note ?? preset?.note),
+    receivedAmount: toText(row?.receivedAmount),
   };
 }
 
@@ -76,14 +77,17 @@ type OneOffForm = ReturnType<typeof initialForm>;
 function toOneOffInput(form: OneOffForm): OneOffInput | string {
   const amount = parseOptionalNumber(form.amount, "Částka");
   const dueDay = parseOptionalDay(form.dueDay);
+  const received = parseOptionalNumber(form.receivedAmount, "Přišlo zatím");
   if (!amount.ok) return amount.error;
   if (!dueDay.ok) return dueDay.error;
+  if (!received.ok) return received.error;
   const name = textOrNull(form.name);
   const category = textOrNull(form.category);
   if (!name || !category || amount.value == null) {
     return "Vyplň název, kategorii a částku";
   }
   return {
+    receivedAmount: received.value,
     direction: form.direction,
     category,
     name,
@@ -297,6 +301,18 @@ export function OneOffDialog({
             onChange={(e) => set("paidOn")(e.target.value)}
           />
         </Field>
+        {form.direction === "income" && form.status !== "paid" && (
+          <Field
+            label="Přišlo zatím (částečně)"
+            hint="Kolik z příjmu už přišlo; prázdné = nic"
+          >
+            <Input
+              inputMode="decimal"
+              value={form.receivedAmount}
+              onChange={(e) => set("receivedAmount")(e.target.value)}
+            />
+          </Field>
+        )}
         <Field label="Poznámka" className="sm:col-span-2">
           <Textarea
             value={form.note}

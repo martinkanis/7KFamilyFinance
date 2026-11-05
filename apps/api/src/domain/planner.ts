@@ -35,6 +35,7 @@ export interface MonthEntryRecord {
   counterpartyId: number | null;
   afterItemId: number | null;
   sortOrder: number | null;
+  receivedAmount: number | null;
 }
 
 /** Uložené pořadí kategorie (tabulka categories). */
@@ -208,6 +209,7 @@ function buildItemRow(
     status: entry?.status ?? "unpaid",
     paidOn: entry?.paidOn ?? null,
     note: entry?.note ?? null,
+    receivedAmount: entry?.receivedAmount ?? null,
     savings: item.savings,
     overrides: overridesOf(entry),
   };
@@ -247,6 +249,7 @@ function buildOneOffRow(
     status: entry.status,
     paidOn: entry.paidOn,
     note: entry.note,
+    receivedAmount: entry.receivedAmount,
     savings: false,
     overrides: overridesOf(entry),
   };
@@ -378,14 +381,28 @@ function sumAmounts(rows: MonthRow[]): number {
   return roundMoney(rows.reduce((sum, row) => sum + row.amount, 0));
 }
 
+/** Kolik z platby už je vyřízeno: zaplacená celá, jinak částečně přijatá část. */
+export function settledAmount(row: MonthRow): number {
+  if (row.status === "paid") return row.amount;
+  return Math.min(Math.max(row.receivedAmount ?? 0, 0), row.amount);
+}
+
+const sumSettled = (rows: MonthRow[]) =>
+  roundMoney(rows.reduce((sum, row) => sum + settledAmount(row), 0));
+
+const sumOutstanding = (rows: MonthRow[]) =>
+  roundMoney(
+    rows.reduce((sum, row) => sum + row.amount - settledAmount(row), 0),
+  );
+
 function summarizeDirection(
   rows: MonthRow[],
   direction: Direction,
 ): DirectionSummary {
   const relevant = rows.filter((row) => row.direction === direction);
   const plan = sumAmounts(relevant);
-  const paid = sumAmounts(relevant.filter((row) => row.status === "paid"));
-  const processing = sumAmounts(
+  const paid = sumSettled(relevant);
+  const processing = sumOutstanding(
     relevant.filter((row) => row.status === "processing"),
   );
   return { plan, paid, processing, remaining: roundMoney(plan - paid) };
@@ -416,15 +433,14 @@ function breakdownRow(
 ): AccountBreakdownRow {
   const expenses = rows.filter((row) => row.direction === "expense");
   const incomes = rows.filter((row) => row.direction === "income");
-  const unpaid = (row: MonthRow) => row.status !== "paid";
   return {
     accountId,
     name,
     owner,
     expensePlan: sumAmounts(expenses),
-    expenseRemaining: sumAmounts(expenses.filter(unpaid)),
+    expenseRemaining: sumOutstanding(expenses),
     incomePlan: sumAmounts(incomes),
-    incomeRemaining: sumAmounts(incomes.filter(unpaid)),
+    incomeRemaining: sumOutstanding(incomes),
   };
 }
 

@@ -35,6 +35,7 @@ const entryFields = {
   ourAccountId: nullableId,
   counterpartyAccount: nullableText(64),
   vs: nullableText(10),
+  receivedAmount: t.Optional(nullableMoney),
 };
 
 const changeableField = t.Union([

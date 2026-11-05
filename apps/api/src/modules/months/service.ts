@@ -50,12 +50,17 @@ export async function getMonthView(month: string): Promise<MonthView> {
   };
 }
 
-/** Datum úhrady dává smysl jen u zaplacené platby; když chybí, doplní se dnešek. */
+/**
+ * Datum úhrady dává smysl jen u zaplacené platby; když chybí, doplní se dnešek.
+ * Částečné plnění patří jen nezaplacené platbě.
+ */
 function entryValues<T extends EntryInput>(input: T): T {
   const values = normalizeTexts(input);
-  const paidOn =
-    values.status === "paid" ? (values.paidOn ?? todayInPrague()) : null;
-  return { ...values, paidOn };
+  const isPaid = values.status === "paid";
+  const paidOn = isPaid ? (values.paidOn ?? todayInPrague()) : null;
+  const received = values.receivedAmount ?? null;
+  const receivedAmount = isPaid || !received ? null : received;
+  return { ...values, paidOn, receivedAmount };
 }
 
 function isDefaultEntry(entry: EntryInput): boolean {
@@ -66,7 +71,8 @@ function isDefaultEntry(entry: EntryInput): boolean {
     entry.dueDay == null &&
     entry.ourAccountId == null &&
     entry.counterpartyAccount == null &&
-    entry.vs == null
+    entry.vs == null &&
+    entry.receivedAmount == null
   );
 }
 

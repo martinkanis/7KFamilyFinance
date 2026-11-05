@@ -61,6 +61,7 @@ export interface ImportedEntry {
   paidOn: string | null;
   note: string | null;
   amount: number | null;
+  receivedAmount: number | null;
   dueDay: number | null;
   ourAccountName: string | null;
   counterpartyAccount: string | null;
@@ -334,6 +335,7 @@ function hasEntryData(entry: ImportedEntry): boolean {
       entry.ourAccountName,
       entry.counterpartyAccount,
       entry.vs,
+      entry.receivedAmount,
     ].some((value) => value != null)
   );
 }
@@ -361,6 +363,7 @@ function parseMonthRow(month: string, row: ExcelJS.Row): ImportedEntry | null {
     ourAccountName: textOf(cell(c.overrideOurAccount)),
     counterpartyAccount: textOf(cell(c.overrideCounterpartyAccount)),
     vs: textOf(cell(c.overrideVs)),
+    receivedAmount: numberOf(cell(c.receivedAmount)),
     name: itemCode ? null : oneOffName,
     direction: itemCode ? null : direction,
     category: itemCode ? null : (textOf(cell(c.category)) ?? UNCATEGORIZED),

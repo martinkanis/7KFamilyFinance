@@ -104,6 +104,7 @@ export function makeEntry(
     counterpartyId: null,
     afterItemId: null,
     sortOrder: null,
+    receivedAmount: null,
     ...overrides,
   };
 }

@@ -122,6 +122,7 @@ export const MONTH_COLUMNS = {
   overrideVs: 18,
   direction: 20,
   category: 21,
+  receivedAmount: 22,
 } as const;
 
 /** Součtový řádek listu „Stav účtů“ – import ho přeskočí. */

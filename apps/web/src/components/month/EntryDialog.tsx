@@ -44,6 +44,7 @@ function initialForm(row: MonthRow) {
     status: row.status,
     paidOn: toText(row.paidOn),
     note: toText(row.note),
+    receivedAmount: toText(row.receivedAmount),
     amount: toText(row.overrides.amount),
     dueDay: toText(row.overrides.dueDay),
     ourAccountId: toText(row.overrides.ourAccountId),
@@ -57,9 +58,12 @@ type EntryForm = ReturnType<typeof initialForm>;
 function toEntryInput(form: EntryForm): EntryInput | string {
   const amount = parseOptionalNumber(form.amount, "Částka");
   const dueDay = parseOptionalDay(form.dueDay);
+  const received = parseOptionalNumber(form.receivedAmount, "Přišlo zatím");
   if (!amount.ok) return amount.error;
   if (!dueDay.ok) return dueDay.error;
+  if (!received.ok) return received.error;
   return {
+    receivedAmount: received.value,
     status: form.status,
     paidOn: textOrNull(form.paidOn),
     note: textOrNull(form.note),
@@ -251,6 +255,18 @@ export function EntryDialog({
             onChange={(e) => set("vs")(e.target.value)}
           />
         </Field>
+        {row.direction === "income" && form.status !== "paid" && (
+          <Field
+            label="Přišlo zatím (částečně)"
+            hint="Kolik z příjmu už přišlo; prázdné = nic"
+          >
+            <Input
+              inputMode="decimal"
+              value={form.receivedAmount}
+              onChange={(e) => set("receivedAmount")(e.target.value)}
+            />
+          </Field>
+        )}
         <Field label="Poznámka" className="sm:col-span-2">
           <Textarea
             value={form.note}
