@@ -186,6 +186,7 @@ export async function createRecurringItem(
           validFrom: firstDayOf(month),
           ourAccountId: values.ourAccountId,
           counterpartyId: values.counterpartyId,
+          paymentTypeId: values.paymentTypeId ?? null,
           counterpartyAccount: values.counterpartyAccount,
           vs: values.vs,
           sortOrder: Number(max?.value ?? 0) + 1,

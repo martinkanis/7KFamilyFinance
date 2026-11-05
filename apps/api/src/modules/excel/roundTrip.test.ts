@@ -25,6 +25,7 @@ const catalog: PlannerCatalog = {
       id: 1,
       code: "V01",
       templateId: 1,
+      paymentTypeId: 3,
       ourAccountId: 1,
       dueMonths: "3,9",
     }),
@@ -60,7 +61,11 @@ const catalog: PlannerCatalog = {
       vs: "77",
     },
   ],
-  categories: [],
+  categories: [
+    { direction: "expense", name: "1. Bydlení", sortOrder: 1, typeId: 1 },
+    { direction: "expense", name: "Prázdná", sortOrder: 2, typeId: null },
+  ],
+  paymentTypes: [{ id: 3, name: "Hypotéky", sortOrder: 1 }],
   insuranceReserve: 1000,
 };
 
@@ -101,6 +106,7 @@ async function exportAndParse() {
   const workbook = buildExportWorkbook({
     settings: { startDate: "2026-11-01" },
     catalog,
+    categoryTypes: [{ id: 1, name: "Osobní spotřeba", sortOrder: 1 }],
     insurance: [{ id: 1, name: "Auto", annualAmount: 12000, note: null }],
     balances: [
       { accountId: 1, month: "2026-10", balance: 15000 },
@@ -141,6 +147,17 @@ describe("export → import", () => {
       amountFromInsurance: true,
       amount: null,
     });
+  });
+
+  it("zachová nadkategorie, pořadí kategorií i typy plateb", async () => {
+    const data = await exportAndParse();
+    expect(data.categoryTypes).toEqual(["Osobní spotřeba"]);
+    expect(data.paymentTypes).toEqual(["Hypotéky"]);
+    expect(data.categories).toEqual([
+      { direction: "expense", name: "1. Bydlení", typeName: "Osobní spotřeba" },
+      { direction: "expense", name: "Prázdná", typeName: null },
+    ]);
+    expect(data.items[0]?.paymentTypeName).toBe("Hypotéky");
   });
 
   it("zachová změny položek od měsíce", async () => {

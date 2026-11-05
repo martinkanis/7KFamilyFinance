@@ -326,3 +326,62 @@ export function TemplatesPage() {
   });
   return <CrudPage config={templatesConfig(counterparties.data ?? [])} />;
 }
+
+/** Číselník typů (nadkategorie / typy plateb): název a pořadí. */
+function typesConfig<R extends "category-types" | "payment-types">(
+  resource: R,
+  texts: {
+    title: string;
+    singular: string;
+    accusative: string;
+    description: string;
+  },
+): CrudConfig<R> {
+  return {
+    resource,
+    ...texts,
+    copySuffixKeys: ["name"],
+    searchText: (t) => t.name,
+    defaults: {},
+    columns: [
+      {
+        label: "Název",
+        render: (t) => <span className="font-medium">{t.name}</span>,
+      },
+      { label: "Pořadí", align: "right", render: (t) => t.sortOrder },
+    ],
+    fields: [
+      { key: "name", label: "Název", kind: "text", required: true },
+      {
+        key: "sortOrder",
+        label: "Pořadí",
+        kind: "integer",
+        hint: "Prázdné = na konec",
+      },
+    ],
+  } as CrudConfig<R>;
+}
+
+const categoryTypesConfig = typesConfig("category-types", {
+  title: "Nadkategorie",
+  singular: "Nadkategorie",
+  accusative: "nadkategorii",
+  description:
+    "Skupiny nad kategoriemi – např. Investiční nemovitosti, Osobní spotřeba, Půjčky a pojistky. Kategorii ji přiřadíš v záhlaví kategorie na stránce měsíce.",
+});
+
+const paymentTypesConfig = typesConfig("payment-types", {
+  title: "Typy plateb",
+  singular: "Typ platby",
+  accusative: "typ platby",
+  description:
+    "Druh platby – např. Energie – elektřina, Nájmy, Hypotéky, Úvěry & půjčky. Platbě ho přiřadíš v měsíci nebo v Položkách.",
+});
+
+export function CategoryTypesPage() {
+  return <CrudPage config={categoryTypesConfig} />;
+}
+
+export function PaymentTypesPage() {
+  return <CrudPage config={paymentTypesConfig} />;
+}

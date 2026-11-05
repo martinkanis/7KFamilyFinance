@@ -1,4 +1,10 @@
-import type { Account, EntryInput, MonthRow } from "@kkff/api/contracts";
+import type {
+  Account,
+  CategoryType,
+  EntryInput,
+  MonthRow,
+  PaymentType,
+} from "@kkff/api/contracts";
 import { ExternalLink } from "lucide-react";
 import { EditableSelect, EditableText } from "@/components/ui/editable";
 import type { ComboOption } from "@/lib/accountOptions";
@@ -17,6 +23,9 @@ import {
 /** Úpravy přímo v tabulce; měsíční hodnoty platí jen pro tento měsíc, název a kategorie všude. */
 export interface RowEditing {
   accounts: Account[];
+  paymentTypes: PaymentType[];
+  /** Typ platby – u pravidelné platby ve všech měsících. */
+  onSetPaymentType: (row: MonthRow, typeId: number | null) => void;
   /** Nabídka pro „účet protistrany“ (protistrany a naše účty). */
   accountOptions: ComboOption[];
   onChange: (row: MonthRow, changes: Partial<EntryInput>) => void;
@@ -124,7 +133,10 @@ export function DetailCells({
   row,
   onChange,
   accountOptions,
-}: CellProps & Pick<RowEditing, "accountOptions">) {
+  paymentTypes,
+  onSetPaymentType,
+}: CellProps &
+  Pick<RowEditing, "accountOptions" | "paymentTypes" | "onSetPaymentType">) {
   const textCell = (
     field: "counterpartyAccount" | "vs" | "note",
     label: string,
@@ -151,6 +163,11 @@ export function DetailCells({
   };
   return (
     <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-xs text-slate-500">
+      <PaymentTypeCell
+        row={row}
+        paymentTypes={paymentTypes}
+        onSetPaymentType={onSetPaymentType}
+      />
       <Counterparty row={row} />
       {textCell(
         "counterpartyAccount",
@@ -309,5 +326,86 @@ export function ReceivedCell({ row, onChange, onInvalid }: CellProps) {
         )}
       </EditableText>
     </span>
+  );
+}
+
+/** Výběr z číselníku typů, který vypadá jako text; prázdná hodnota se nabídne po najetí. */
+function TypeSelect({
+  label,
+  emptyLabel,
+  value,
+  types,
+  shownName,
+  onPick,
+}: {
+  label: string;
+  emptyLabel: string;
+  value: number | null;
+  types: CategoryType[];
+  shownName: string | null;
+  onPick: (typeId: number | null) => void;
+}) {
+  return (
+    <span className={cn("text-xs", value == null && REVEAL_ON_ROW)}>
+      <EditableSelect
+        label={label}
+        display={
+          shownName ? (
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-600">
+              {shownName}
+            </span>
+          ) : (
+            <span className="text-slate-400">{emptyLabel}</span>
+          )
+        }
+        value={value == null ? "" : String(value)}
+        onChange={(event) => onPick(idOrNull(event.target.value))}
+      >
+        <option value="">– bez typu –</option>
+        {types.map((type) => (
+          <option key={type.id} value={type.id}>
+            {type.name}
+          </option>
+        ))}
+      </EditableSelect>
+    </span>
+  );
+}
+
+export function PaymentTypeCell({
+  row,
+  paymentTypes,
+  onSetPaymentType,
+}: Pick<RowEditing, "paymentTypes" | "onSetPaymentType"> & { row: MonthRow }) {
+  return (
+    <TypeSelect
+      label={row.isOneOff ? "Typ platby" : "Typ platby (ve všech měsících)"}
+      emptyLabel="+ typ platby"
+      value={row.paymentType?.id ?? null}
+      types={paymentTypes}
+      shownName={row.paymentType?.name ?? null}
+      onPick={(typeId) => onSetPaymentType(row, typeId)}
+    />
+  );
+}
+
+export function CategoryTypeCell({
+  typeId,
+  categoryTypes,
+  onPick,
+}: {
+  typeId: number | null;
+  categoryTypes: CategoryType[];
+  onPick: (typeId: number | null) => void;
+}) {
+  return (
+    <TypeSelect
+      label="Nadkategorie"
+      emptyLabel="+ nadkategorie"
+      value={typeId}
+      types={categoryTypes}
+      shownName={categoryTypes.find((t) => t.id === typeId)?.name ?? null}
+      onPick={onPick}
+    />
   );
 }

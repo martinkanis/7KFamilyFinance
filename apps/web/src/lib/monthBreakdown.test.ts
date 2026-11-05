@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { MonthRow } from "@kkff/api/contracts";
-import { CATEGORICAL_COLORS } from "./chartColors.ts";
-import { categoryBreakdown } from "./monthBreakdown.ts";
+import { CATEGORICAL_COLORS, categoricalColor } from "./chartColors.ts";
+import { categoryBreakdown, typeBreakdown } from "./monthBreakdown.ts";
 
 const row = (
   category: string,
@@ -52,13 +52,34 @@ describe("rozpad měsíce podle kategorií", () => {
     ]);
   });
 
-  it("nad osm kategorií sloučí zbytek do Ostatní", () => {
+  it("ukáže všechny kategorie, za osmou světlejší barvy", () => {
     const rows = Array.from({ length: 10 }, (_, i) => row(`K${i}`, 100));
     const result = categoryBreakdown(rows, "expense", null);
-    expect(result).toHaveLength(8);
-    expect(result.at(-1)).toMatchObject({
-      label: "Ostatní kategorie",
-      value: 300,
-    });
+    expect(result).toHaveLength(10);
+    expect(result[8]?.color).not.toBe(result[0]?.color);
+    expect(result[8]?.color).toBe(categoricalColor(8));
+  });
+
+  it("rozdělí podle typu, bez typu šedě na konci", () => {
+    const rows = [
+      { ...row("A", 100), paymentType: { id: 2, name: "Nájmy" } },
+      { ...row("B", 50), paymentType: { id: 2, name: "Nájmy" } },
+      { ...row("C", 30), paymentType: null },
+    ] as MonthRow[];
+    const result = typeBreakdown(
+      rows,
+      "expense",
+      [
+        { id: 1, name: "Energie" },
+        { id: 2, name: "Nájmy" },
+      ],
+      (r) => r.paymentType?.id ?? null,
+      "Bez typu",
+    );
+    expect(result.map((s) => [s.label, s.value])).toEqual([
+      ["Nájmy", 150],
+      ["Bez typu", 30],
+    ]);
+    expect(result[0]?.color).toBe(categoricalColor(1));
   });
 });

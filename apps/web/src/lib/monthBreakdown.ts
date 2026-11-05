@@ -1,6 +1,6 @@
-import type { Direction, MonthRow } from "@kkff/api/contracts";
-import { CATEGORICAL_COLORS } from "./chartColors";
-import { groupByCategory } from "./monthRows";
+import type { Direction, MonthRow, NamedRef } from "@kkff/api/contracts";
+import { categoricalColor, UNASSIGNED_COLOR } from "./chartColors";
+import { groupByCategory, settledAmount } from "./monthRows";
 
 export interface CategorySegment {
   key: string;
@@ -13,18 +13,9 @@ export interface CategorySegment {
   change: number | null;
 }
 
-const OTHER_KEY = "__other";
-
-function sumOrNull(values: (number | null)[]): number | null {
-  return values.some((v) => v == null)
-    ? null
-    : values.reduce<number>((sum, v) => sum + (v ?? 0), 0);
-}
-
 /**
  * Kategorie jednoho směru v pořadí, v jakém jsou v měsíci (barva se tak
- * nemění podle velikosti). Nad osm kategorií se zbytek sloučí do „Ostatní“;
- * kategorie s nulovým plánem se vynechají.
+ * nemění podle velikosti); kategorie s nulovým plánem se vynechají.
  */
 export function categoryBreakdown(
   rows: MonthRow[],
@@ -39,7 +30,7 @@ export function categoryBreakdown(
     previous
       ? (previous.find((g) => g.category === category)?.plan ?? 0)
       : null;
-  let segments = groups.map((group) => {
+  const segments = groups.map((group) => {
     const before = previousPlan(group.category);
     return {
       key: group.category,
@@ -49,24 +40,54 @@ export function categoryBreakdown(
       change: before == null ? null : group.plan - before,
     };
   });
-  const maxSlots = CATEGORICAL_COLORS.length;
-  if (segments.length > maxSlots) {
-    const rest = segments.slice(maxSlots - 1);
-    segments = [
-      ...segments.slice(0, maxSlots - 1),
-      {
-        key: OTHER_KEY,
-        label: "Ostatní kategorie",
-        value: rest.reduce((sum, s) => sum + s.value, 0),
-        remaining: rest.reduce((sum, s) => sum + s.remaining, 0),
-        change: sumOrNull(rest.map((s) => s.change)),
-      },
-    ];
-  }
   return segments
     .map((segment, index) => ({
       ...segment,
-      color: CATEGORICAL_COLORS[index] ?? CATEGORICAL_COLORS[0],
+      color: categoricalColor(index),
+    }))
+    .filter((segment) => segment.value !== 0);
+}
+
+export const UNASSIGNED_KEY = "__none";
+
+/**
+ * Rozpad směru podle typu (nadkategorie, typ platby). Barva podle pořadí typu
+ * v seznamu, platby bez typu jsou šedě na konci; prázdné typy se vynechají.
+ */
+export function typeBreakdown(
+  rows: MonthRow[],
+  direction: Direction,
+  types: NamedRef[],
+  typeOf: (row: MonthRow) => number | null,
+  unassignedLabel: string,
+): CategorySegment[] {
+  const relevant = rows.filter((row) => row.direction === direction);
+  const groups = [
+    ...types.map((type, index) => ({
+      key: String(type.id),
+      label: type.name,
+      color: categoricalColor(index),
+      rows: relevant.filter((row) => typeOf(row) === type.id),
+    })),
+    {
+      key: UNASSIGNED_KEY,
+      label: unassignedLabel,
+      color: UNASSIGNED_COLOR,
+      rows: relevant.filter((row) => {
+        const id = typeOf(row);
+        return id == null || !types.some((type) => type.id === id);
+      }),
+    },
+  ];
+  return groups
+    .map(({ rows: groupRows, ...group }) => ({
+      ...group,
+      value: groupRows.reduce((sum, row) => sum + row.amount, 0),
+      remaining: groupRows.reduce(
+        (sum, row) => sum + row.amount - settledAmount(row),
+        0,
+      ),
+      change: null,
     }))
     .filter((segment) => segment.value !== 0);
 }

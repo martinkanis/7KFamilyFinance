@@ -8,6 +8,10 @@ import { counterpartyRoutes } from "./modules/catalog/counterparties.ts";
 import { insuranceRoutes } from "./modules/catalog/insurance.ts";
 import { settingsRoutes } from "./modules/catalog/settings.ts";
 import { templateRoutes } from "./modules/catalog/templates.ts";
+import {
+  categoryTypeRoutes,
+  paymentTypeRoutes,
+} from "./modules/catalog/types.ts";
 import { categoryRoutes } from "./modules/categories/routes.ts";
 import { excelRoutes } from "./modules/excel/routes.ts";
 import { itemRoutes } from "./modules/items/routes.ts";
@@ -83,6 +87,8 @@ export const app = new Elysia()
   .use(insuranceRoutes)
   .use(itemRoutes)
   .use(categoryRoutes)
+  .use(categoryTypeRoutes)
+  .use(paymentTypeRoutes)
   .use(monthRoutes)
   .use(overviewRoutes)
   .use(balanceRoutes)

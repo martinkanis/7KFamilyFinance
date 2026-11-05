@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import type {
   AccountBalance,
   CategoryMatrix,
+  CategoryType,
   InsurancePolicy,
   MonthView,
   Overview,
@@ -34,6 +35,7 @@ import {
   SHEETS,
   START_DATE_CELL,
   TABLE_HEADER_ROW,
+  TYPE_KINDS,
   templateKey,
   YES,
 } from "./layout.ts";
@@ -41,6 +43,7 @@ import {
 export interface ExportInput {
   settings: Settings;
   catalog: PlannerCatalog;
+  categoryTypes: CategoryType[];
   insurance: InsurancePolicy[];
   balances: AccountBalance[];
   overview: Overview;
@@ -226,7 +229,9 @@ function writeItemsSheet(
     "Do úspor",
     "Aktivní",
     "Poznámka",
+    "Typ platby",
   ]);
+  const paymentTypes = nameById(catalog.paymentTypes);
   writeRows(
     sheet,
     FIRST_TABLE_ROW,
@@ -260,13 +265,19 @@ function writeItemsSheet(
       yesOrBlank(item.savings),
       yesNo(item.active),
       item.note,
+      item.paymentTypeId == null
+        ? null
+        : (paymentTypes.get(item.paymentTypeId) ?? null),
     ]),
   );
   formatColumns(sheet, [5], MONEY_FORMAT);
   formatColumns(sheet, [8, 9], DATE_FORMAT);
   setColumnWidths(
     sheet,
-    [6, 8, 30, 34, 13, 9, 12, 11, 11, 22, 26, 34, 21, 11, 7, 7, 20, 9, 8, 50],
+    [
+      6, 8, 30, 34, 13, 9, 12, 11, 11, 22, 26, 34, 21, 11, 7, 7, 20, 9, 8, 50,
+      22,
+    ],
   );
 }
 
@@ -519,6 +530,44 @@ function writeItemChangesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
   setColumnWidths(sheet, [11, 10, 13, 9, 22, 21, 11]);
 }
 
+/** Nadkategorie a typy plateb (i nepoužité), v pořadí; jde zpět importovat. */
+function writeTypesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
+  const sheet = wb.addWorksheet(SHEETS.types);
+  writeTitle(sheet, "Nadkategorie a typy plateb");
+  writeHeaderRow(sheet, TABLE_HEADER_ROW, ["Druh", "Název"]);
+  writeRows(sheet, FIRST_TABLE_ROW, [
+    ...input.categoryTypes.map((t) => [TYPE_KINDS.category, t.name]),
+    ...[...input.catalog.paymentTypes]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((t) => [TYPE_KINDS.payment, t.name]),
+  ]);
+  setColumnWidths(sheet, [16, 34]);
+}
+
+/** Pořadí kategorií (i prázdných) a jejich nadkategorie; jde zpět importovat. */
+function writeCategoriesSheet(wb: ExcelJS.Workbook, input: ExportInput): void {
+  const sheet = wb.addWorksheet(SHEETS.categories);
+  writeTitle(sheet, "Kategorie – pořadí a nadkategorie");
+  writeHeaderRow(sheet, TABLE_HEADER_ROW, [
+    "Směr",
+    "Kategorie",
+    "Nadkategorie",
+  ]);
+  const typeNames = nameById(input.categoryTypes);
+  writeRows(
+    sheet,
+    FIRST_TABLE_ROW,
+    [...input.catalog.categories]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((c) => [
+        DIRECTION_LABELS[c.direction],
+        c.name,
+        c.typeId == null ? null : (typeNames.get(c.typeId) ?? null),
+      ]),
+  );
+  setColumnWidths(sheet, [8, 34, 26]);
+}
+
 export function buildExportWorkbook(input: ExportInput): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
   wb.creator = "7KFamilyFinance";
@@ -535,5 +584,7 @@ export function buildExportWorkbook(input: ExportInput): ExcelJS.Workbook {
   writeTemplatesSheet(wb, input);
   writeCounterpartiesSheet(wb, input);
   writeInsuranceSheet(wb, input);
+  writeCategoriesSheet(wb, input);
+  writeTypesSheet(wb, input);
   return wb;
 }

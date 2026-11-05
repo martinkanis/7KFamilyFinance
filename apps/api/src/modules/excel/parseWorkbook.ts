@@ -38,6 +38,7 @@ import {
   STATUS_LABELS,
   TABLE_HEADER_ROW,
   TEMPLATE_COLUMNS,
+  TYPE_KINDS,
   templateCodeFromKey,
 } from "./layout.ts";
 
@@ -47,12 +48,19 @@ export type ImportedTemplate = Omit<TemplateInput, "counterpartyId"> & {
 
 export type ImportedItem = Omit<
   ItemInput,
-  "ourAccountId" | "counterpartyId" | "templateId"
+  "ourAccountId" | "counterpartyId" | "templateId" | "paymentTypeId"
 > & {
   ourAccountName: string | null;
   counterpartyName: string | null;
   templateCode: string | null;
+  paymentTypeName: string | null;
 };
+
+export interface ImportedCategory {
+  direction: Direction;
+  name: string;
+  typeName: string | null;
+}
 
 export interface ImportedEntry {
   month: string;
@@ -62,6 +70,7 @@ export interface ImportedEntry {
   note: string | null;
   amount: number | null;
   receivedAmount: number | null;
+  paymentTypeName: string | null;
   dueDay: number | null;
   ourAccountName: string | null;
   counterpartyAccount: string | null;
@@ -96,6 +105,9 @@ export interface ImportData {
   insurance: InsurancePolicyInput[];
   items: ImportedItem[];
   itemChanges: ImportedItemChange[];
+  categoryTypes: string[];
+  paymentTypes: string[];
+  categories: ImportedCategory[];
   entries: ImportedEntry[];
   corrections: { month: string; amount: number }[];
   balances: ImportedBalance[];
@@ -312,6 +324,7 @@ function parseItem(
     savings: isYes(cell(c.savings)),
     active: textOf(cell(c.active)) !== NO,
     note: textOf(cell(c.note)),
+    paymentTypeName: textOf(cell(c.paymentType)),
     sortOrder: index + 1,
   };
 }
@@ -364,6 +377,7 @@ function parseMonthRow(month: string, row: ExcelJS.Row): ImportedEntry | null {
     counterpartyAccount: textOf(cell(c.overrideCounterpartyAccount)),
     vs: textOf(cell(c.overrideVs)),
     receivedAmount: numberOf(cell(c.receivedAmount)),
+    paymentTypeName: itemCode ? null : textOf(cell(c.paymentType)),
     name: itemCode ? null : oneOffName,
     direction: itemCode ? null : direction,
     category: itemCode ? null : (textOf(cell(c.category)) ?? UNCATEGORIZED),
@@ -461,6 +475,41 @@ function parseItemChanges(wb: ExcelJS.Workbook): ImportedItemChange[] {
   });
 }
 
+/** List „Typy“: nadkategorie a typy plateb v pořadí. Volitelný. */
+function parseTypes(wb: ExcelJS.Workbook): {
+  categoryTypes: string[];
+  paymentTypes: string[];
+} {
+  const rows = rowsWithKey(wb.getWorksheet(SHEETS.types), FIRST_TABLE_ROW, 2);
+  const namesOf = (kind: string) => [
+    ...new Set(
+      rows
+        .filter((cell) => textOf(cell(1)) === kind)
+        .map((cell) => textOf(cell(2)))
+        .filter((name): name is string => name != null),
+    ),
+  ];
+  return {
+    categoryTypes: namesOf(TYPE_KINDS.category),
+    paymentTypes: namesOf(TYPE_KINDS.payment),
+  };
+}
+
+/** List „Kategorie“: pořadí kategorií (i prázdných) a nadkategorie. Volitelný. */
+function parseCategories(wb: ExcelJS.Workbook): ImportedCategory[] {
+  return rowsWithKey(
+    wb.getWorksheet(SHEETS.categories),
+    FIRST_TABLE_ROW,
+    2,
+  ).flatMap((cell) => {
+    const direction = reverseLabel(DIRECTION_LABELS, textOf(cell(1)));
+    const name = textOf(cell(2));
+    return direction && name
+      ? [{ direction, name, typeName: textOf(cell(3)) }]
+      : [];
+  });
+}
+
 function requireSheets(wb: ExcelJS.Workbook): void {
   const missing = [SHEETS.items, SHEETS.accounts].filter(
     (name) => !wb.getWorksheet(name),
@@ -507,6 +556,8 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<ImportData> {
       warnings,
     ),
     itemChanges: parseItemChanges(wb),
+    ...parseTypes(wb),
+    categories: parseCategories(wb),
     entries: parseMonthSheets(wb),
     corrections: parseCorrections(wb),
     balances: parseBalances(wb),

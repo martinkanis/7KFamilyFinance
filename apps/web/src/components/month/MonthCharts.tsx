@@ -1,4 +1,5 @@
-import type { MonthSummary } from "@kkff/api/contracts";
+import type { Direction, MonthSummary } from "@kkff/api/contracts";
+import { useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { percentLabel } from "@/components/ui/breakdown";
 import { cn } from "@/lib/cn";
@@ -93,7 +94,7 @@ function Donut({
                 <span className="tabular-nums text-slate-800">
                   {formatMoney(slice.value)}
                 </span>
-                <span className="w-10 text-right tabular-nums text-slate-500">
+                <span className="w-12 text-right whitespace-nowrap tabular-nums text-slate-500">
                   {percentLabel(slice.value / total)}
                 </span>
               </li>
@@ -105,16 +106,32 @@ function Donut({
   );
 }
 
-/** Koláčové grafy měsíce: výdaje a příjmy podle kategorií a kam jdou příjmy. */
+export type ChartGrouping = "category" | "categoryType" | "paymentType";
+
+const GROUPINGS: { value: ChartGrouping; label: string; of: string }[] = [
+  { value: "category", label: "Kategorie", of: "kategorií" },
+  { value: "categoryType", label: "Nadkategorie", of: "nadkategorií" },
+  { value: "paymentType", label: "Typ platby", of: "typu platby" },
+];
+
+/**
+ * Koláčové grafy měsíce: výdaje a příjmy a kam jdou příjmy – podle kategorií,
+ * nadkategorií nebo typu platby (přepínač).
+ */
 export function MonthCharts({
   summary,
-  expense,
-  income,
+  segmentsFor,
 }: {
   summary: MonthSummary;
-  expense: CategorySegment[];
-  income: CategorySegment[];
+  segmentsFor: (
+    grouping: ChartGrouping,
+    direction: Direction,
+  ) => CategorySegment[];
 }) {
+  const [grouping, setGrouping] = useState<ChartGrouping>("category");
+  const of = GROUPINGS.find((g) => g.value === grouping)?.of ?? "";
+  const expense = segmentsFor(grouping, "expense");
+  const income = segmentsFor(grouping, "income");
   const left = summary.income.plan - summary.expense.plan;
   const balanceSlices: Slice[] = [
     ...positive(expense),
@@ -123,27 +140,51 @@ export function MonthCharts({
       : []),
   ];
   return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <Donut
-        title="Výdaje podle kategorií"
-        slices={positive(expense)}
-        center={{ label: "výdaje", value: summary.expense.plan }}
-      />
-      <Donut
-        title="Příjmy podle kategorií"
-        slices={positive(income)}
-        center={{ label: "příjmy", value: summary.income.plan }}
-      />
-      <Donut
-        title="Bilance – kam jdou příjmy"
-        slices={balanceSlices}
-        center={
-          left >= 0
-            ? { label: "zůstává", value: left }
-            : { label: "schodek", value: left }
-        }
-        centerTone={left >= 0 ? "good" : "bad"}
-      />
+    <div>
+      <div
+        role="group"
+        aria-label="Grafy podle"
+        className="mb-4 inline-flex rounded-lg bg-slate-100 p-0.5 text-sm"
+      >
+        {GROUPINGS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={grouping === option.value}
+            onClick={() => setGrouping(option.value)}
+            className={cn(
+              "rounded-md px-3 py-1.5 font-medium",
+              grouping === option.value
+                ? "bg-white text-brand-700 shadow-sm"
+                : "text-slate-600 hover:text-slate-900",
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <Donut
+          title={`Výdaje podle ${of}`}
+          slices={positive(expense)}
+          center={{ label: "výdaje", value: summary.expense.plan }}
+        />
+        <Donut
+          title={`Příjmy podle ${of}`}
+          slices={positive(income)}
+          center={{ label: "příjmy", value: summary.income.plan }}
+        />
+        <Donut
+          title="Bilance – kam jdou příjmy"
+          slices={balanceSlices}
+          center={
+            left >= 0
+              ? { label: "zůstává", value: left }
+              : { label: "schodek", value: left }
+          }
+          centerTone={left >= 0 ? "good" : "bad"}
+        />
+      </div>
     </div>
   );
 }

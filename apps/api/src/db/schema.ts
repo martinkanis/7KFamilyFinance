@@ -109,6 +109,9 @@ export const items = pgTable(
     templateId: integer().references(() => templates.id, {
       onDelete: "set null",
     }),
+    paymentTypeId: integer().references(() => paymentTypes.id, {
+      onDelete: "set null",
+    }),
     counterpartyAccount: text(),
     vs: text(),
     ks: text(),
@@ -127,6 +130,20 @@ export const items = pgTable(
   ],
 );
 
+/** Typ kategorie (vlastní seznam): Investiční nemovitosti, Osobní spotřeba… */
+export const categoryTypes = pgTable("category_types", {
+  id: serial().primaryKey(),
+  name: text().notNull().unique(),
+  sortOrder: integer().notNull().default(0),
+});
+
+/** Typ platby (vlastní seznam): Energie – elektřina, Nájmy, Hypotéky… */
+export const paymentTypes = pgTable("payment_types", {
+  id: serial().primaryKey(),
+  name: text().notNull().unique(),
+  sortOrder: integer().notNull().default(0),
+});
+
 /**
  * Pořadí kategorií a prázdné kategorie. Kategorie je jinak jen text
  * u položek a plateb; ty, které tu nejsou, se řadí za tyto podle položek.
@@ -138,6 +155,9 @@ export const categories = pgTable(
     direction: directionEnum().notNull(),
     name: text().notNull(),
     sortOrder: integer().notNull().default(0),
+    typeId: integer().references(() => categoryTypes.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     uniqueIndex("categories_direction_name").on(table.direction, table.name),
@@ -206,6 +226,10 @@ export const monthEntries = pgTable(
     sortOrder: integer(),
     /** Částečné plnění: kolik už přišlo/odešlo, dokud platba není celá. */
     receivedAmount: money(),
+    /** Typ jednorázové platby (u položky je typ na položce). */
+    paymentTypeId: integer().references(() => paymentTypes.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     uniqueIndex("month_entries_month_item").on(table.month, table.itemId),

@@ -1,6 +1,7 @@
 import type {
   Account,
   AccountBreakdownRow,
+  CategoryInfo,
   CategoryRef,
   Counterparty,
   Direction,
@@ -10,6 +11,7 @@ import type {
   MonthRow,
   MonthSummary,
   PaymentStatus,
+  PaymentType,
   Template,
 } from "../contracts.ts";
 import { itemAsOf } from "./itemChanges.ts";
@@ -36,11 +38,13 @@ export interface MonthEntryRecord {
   afterItemId: number | null;
   sortOrder: number | null;
   receivedAmount: number | null;
+  paymentTypeId: number | null;
 }
 
-/** Uložené pořadí kategorie (tabulka categories). */
+/** Uložené pořadí a typ kategorie (tabulka categories). */
 export interface CategoryRecord extends CategoryRef {
   sortOrder: number;
+  typeId: number | null;
 }
 
 export interface PlannerCatalog {
@@ -51,6 +55,7 @@ export interface PlannerCatalog {
   /** Změny položek od měsíce dál. */
   itemChanges: ItemChange[];
   categories: CategoryRecord[];
+  paymentTypes: PaymentType[];
   insuranceReserve: number;
 }
 
@@ -59,6 +64,7 @@ interface CatalogIndex {
   templates: Map<number, Template>;
   counterparties: Map<number, Counterparty>;
   accounts: Map<number, Account>;
+  paymentTypes: Map<number, PaymentType>;
   changesByItem: Map<number, ItemChange[]>;
   categoryRank: Map<string, number>;
 }
@@ -107,6 +113,7 @@ export function indexCatalog(catalog: PlannerCatalog): CatalogIndex {
     templates: indexById(catalog.templates),
     counterparties: indexById(catalog.counterparties),
     accounts: indexById(catalog.accounts),
+    paymentTypes: indexById(catalog.paymentTypes),
     changesByItem: groupChangesByItem(catalog.itemChanges),
     categoryRank: rankCategories(catalog),
   };
@@ -139,6 +146,11 @@ function itemBaseAmount(
 function accountRef(index: CatalogIndex, id: number | null) {
   const account = id == null ? undefined : index.accounts.get(id);
   return account ? { id: account.id, name: account.name } : null;
+}
+
+function paymentTypeRef(index: CatalogIndex, id: number | null) {
+  const type = id == null ? undefined : index.paymentTypes.get(id);
+  return type ? { id: type.id, name: type.name } : null;
 }
 
 function counterpartyRef(index: CatalogIndex, id: number | null) {
@@ -190,6 +202,7 @@ function buildItemRow(
     template: template
       ? { id: template.id, name: template.name, code: template.code }
       : null,
+    paymentType: paymentTypeRef(index, item.paymentTypeId),
     ourAccount: accountRef(index, entry?.ourAccountId ?? item.ourAccountId),
     counterpartyAccount: firstFilled(
       entry?.counterpartyAccount,
@@ -232,6 +245,7 @@ function buildOneOffRow(
     name: entry.name ?? "",
     counterparty,
     template: null,
+    paymentType: paymentTypeRef(index, entry.paymentTypeId),
     ourAccount: accountRef(index, entry.ourAccountId),
     counterpartyAccount: firstFilled(
       entry.counterpartyAccount,
@@ -325,11 +339,19 @@ function sortRows(
 export function monthCategories(
   index: CatalogIndex,
   rows: MonthRow[],
-): CategoryRef[] {
-  const seen = new Map<string, CategoryRef>();
+): CategoryInfo[] {
+  const seen = new Map<string, CategoryInfo>();
+  const typeOf = new Map(
+    index.catalog.categories.map((c) => [
+      categoryKey(c.direction, c.name),
+      c.typeId,
+    ]),
+  );
   const add = (direction: Direction, name: string) => {
     const key = categoryKey(direction, name);
-    if (!seen.has(key)) seen.set(key, { direction, name });
+    if (!seen.has(key)) {
+      seen.set(key, { direction, name, typeId: typeOf.get(key) ?? null });
+    }
   };
   for (const category of index.catalog.categories) {
     add(category.direction, category.name);
@@ -338,7 +360,7 @@ export function monthCategories(
     add(item.direction, item.category);
   }
   for (const row of rows) add(row.direction, row.category);
-  const rankOf = (c: CategoryRef) =>
+  const rankOf = (c: CategoryInfo) =>
     index.categoryRank.get(categoryKey(c.direction, c.name)) ??
     Number.MAX_SAFE_INTEGER;
   return [...seen.values()].sort(

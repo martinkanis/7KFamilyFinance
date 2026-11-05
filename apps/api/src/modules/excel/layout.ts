@@ -11,6 +11,14 @@ export const SHEETS = {
   insurance: "Pojistky",
   balances: "Stav účtů",
   itemChanges: "Změny položek",
+  categories: "Kategorie",
+  types: "Typy",
+} as const;
+
+/** List „Typy“: druh (nadkategorie / typ platby) a název, v pořadí. */
+export const TYPE_KINDS = {
+  category: "Nadkategorie",
+  payment: "Typ platby",
 } as const;
 
 export const MONTH_SHEET_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -100,6 +108,7 @@ export const ITEM_COLUMNS = {
   savings: 18,
   active: 19,
   note: 20,
+  paymentType: 21,
 } as const;
 
 export const MONTH_COLUMNS = {
@@ -123,6 +132,7 @@ export const MONTH_COLUMNS = {
   direction: 20,
   category: 21,
   receivedAmount: 22,
+  paymentType: 23,
 } as const;
 
 /** Součtový řádek listu „Stav účtů“ – import ho přeskočí. */

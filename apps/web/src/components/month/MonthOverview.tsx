@@ -1,7 +1,9 @@
 import type {
+  CategoryType,
   Direction,
   DirectionSummary,
   MonthView,
+  PaymentType,
 } from "@kkff/api/contracts";
 import { ChevronDown } from "lucide-react";
 import {
@@ -15,7 +17,11 @@ import { Card } from "@/components/ui/card";
 import { categoryNumber, numberedCategory } from "@/lib/categoryNumbers";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
-import { type CategorySegment, categoryBreakdown } from "@/lib/monthBreakdown";
+import {
+  type CategorySegment,
+  categoryBreakdown,
+  typeBreakdown,
+} from "@/lib/monthBreakdown";
 import { DESKTOP_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
 import { MonthCharts } from "./MonthCharts";
 
@@ -196,8 +202,12 @@ export function MonthOverview({
   view,
   previous,
   direction,
+  categoryTypes,
+  paymentTypes,
 }: {
   view: MonthView;
+  categoryTypes: CategoryType[];
+  paymentTypes: PaymentType[];
   /** Minulý měsíc pro porovnání; dokud se nenačte, změny se neukazují. */
   previous: MonthView | undefined;
   direction: Direction;
@@ -286,8 +296,33 @@ export function MonthOverview({
         <div className="mt-4">
           <MonthCharts
             summary={view.summary}
-            expense={breakdownOf("expense")}
-            income={breakdownOf("income")}
+            segmentsFor={(grouping, d) => {
+              if (grouping === "category") return breakdownOf(d);
+              if (grouping === "paymentType") {
+                return typeBreakdown(
+                  view.rows,
+                  d,
+                  paymentTypes,
+                  (row) => row.paymentType?.id ?? null,
+                  "Bez typu platby",
+                );
+              }
+              const typeOfCategory = new Map(
+                view.categories.map((c) => [
+                  `${c.direction}|${c.name}`,
+                  c.typeId,
+                ]),
+              );
+              return typeBreakdown(
+                view.rows,
+                d,
+                categoryTypes,
+                (row) =>
+                  typeOfCategory.get(`${row.direction}|${row.category}`) ??
+                  null,
+                "Bez nadkategorie",
+              );
+            }}
           />
         </div>
       </details>

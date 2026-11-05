@@ -22,6 +22,7 @@ const row: MonthRow = {
   name: "Energie",
   counterparty: null,
   template: null,
+  paymentType: null,
   ourAccount: { id: 1, name: "Společný" },
   counterpartyAccount: "123/0800",
   vs: "111",
@@ -239,6 +240,7 @@ describe("duplikování platby", () => {
       counterpartyAccount: "123/0800",
       vs: "111",
       note: null,
+      paymentTypeId: null,
       recurring: true,
     });
     expect(copyOf({ ...row, isOneOff: true }).recurring).toBe(false);

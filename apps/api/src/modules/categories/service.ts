@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type {
   CategoryDelete,
   CategoryRef,
+  CategoryTypeAssign,
   Direction,
   RowOrder,
 } from "../../contracts.ts";
@@ -66,6 +67,12 @@ async function saveCategoryOrder(
 ): Promise<string[]> {
   const used = await usedCategories(executor, direction);
   const ordered = [...new Set([...names, ...used])];
+  // Nadkategorie zůstane kategorii i po přeuložení pořadí.
+  const stored = await executor
+    .select({ name: categories.name, typeId: categories.typeId })
+    .from(categories)
+    .where(eq(categories.direction, direction));
+  const typeOf = new Map(stored.map((row) => [row.name, row.typeId]));
   await executor.delete(categories).where(eq(categories.direction, direction));
   if (ordered.length > 0) {
     await executor.insert(categories).values(
@@ -73,10 +80,32 @@ async function saveCategoryOrder(
         direction,
         name,
         sortOrder: index + 1,
+        typeId: typeOf.get(name) ?? null,
       })),
     );
   }
   return ordered;
+}
+
+/** Nadkategorie kategorie (null ji odebere); kategorie se uloží do pořadí, pokud tam není. */
+export function setCategoryType({
+  direction,
+  name,
+  typeId,
+}: CategoryTypeAssign): Promise<void> {
+  return db.transaction(async (tx) => {
+    const known = await knownCategories(tx, direction);
+    if (!known.includes(name)) {
+      throw invalidInput(`Kategorie „${name}“ neexistuje`);
+    }
+    await saveCategoryOrder(tx, direction, known);
+    await tx
+      .update(categories)
+      .set({ typeId })
+      .where(
+        and(eq(categories.direction, direction), eq(categories.name, name)),
+      );
+  });
 }
 
 export function orderCategories(
@@ -144,11 +173,28 @@ export async function renameStoredCategory(
   to: string,
 ): Promise<void> {
   const known = await knownCategories(executor, direction);
+  // Přejmenovaná kategorie si nechá nadkategorii (pokud cílová žádnou nemá).
+  const typeOf = async (name: string) =>
+    (
+      await executor
+        .select({ typeId: categories.typeId })
+        .from(categories)
+        .where(
+          and(eq(categories.direction, direction), eq(categories.name, name)),
+        )
+    )[0]?.typeId ?? null;
+  const fromType = await typeOf(from);
   await saveCategoryOrder(
     executor,
     direction,
     known.map((name) => (name === from ? to : name)),
   );
+  if (fromType != null && (await typeOf(to)) == null) {
+    await executor
+      .update(categories)
+      .set({ typeId: fromType })
+      .where(and(eq(categories.direction, direction), eq(categories.name, to)));
+  }
 }
 
 /**

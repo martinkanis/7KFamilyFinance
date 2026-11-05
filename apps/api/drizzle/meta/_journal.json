@@ -57,6 +57,13 @@
       "when": 1793888784975,
       "tag": "0007_received_amount",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793895768242,
+      "tag": "0008_types",
+      "breakpoints": true
     }
   ]
 }

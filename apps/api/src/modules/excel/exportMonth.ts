@@ -64,6 +64,7 @@ const MONTH_HEADERS = [
   "Směr",
   "Kategorie",
   "Částečně (přišlo / utraceno)",
+  "Typ platby",
 ];
 
 const VISIBLE_WIDTH = 12;
@@ -175,6 +176,11 @@ function writePaymentRow(
     [C.direction, DIRECTION_LABELS[payment.direction]],
     [C.category, payment.category],
     [C.receivedAmount, payment.receivedAmount],
+    // Typ jednorázové platby (u položky je na listu Položky).
+    [
+      C.paymentType,
+      payment.isOneOff ? (payment.paymentType?.name ?? null) : null,
+    ],
   ];
   for (const [column, value] of values) {
     row.getCell(column).value = value;

@@ -55,6 +55,7 @@ const itemBody = t.Object({
   ourAccountId: nullableId,
   counterpartyId: nullableId,
   templateId: nullableId,
+  paymentTypeId: t.Optional(nullableId),
   counterpartyAccount: nullableText(64),
   vs: nullableText(10),
   ks: nullableText(10),
@@ -76,6 +77,7 @@ type ItemValues = Omit<ItemBody, "effectiveFrom">;
 const itemRenameBody = t.Object({
   name: t.Optional(requiredText()),
   category: t.Optional(requiredText()),
+  paymentTypeId: t.Optional(nullableId),
 });
 
 const categoryRenameBody = t.Object({
@@ -247,8 +249,12 @@ export const itemRoutes = new Elysia({ prefix: "/api/items" })
     "/:id",
     async ({ params, body }): Promise<Item> => {
       const rename = normalizeTexts(body);
-      if (rename.name == null && rename.category == null) {
-        throw invalidInput("Vyplň nový název nebo kategorii");
+      if (
+        rename.name == null &&
+        rename.category == null &&
+        rename.paymentTypeId === undefined
+      ) {
+        throw invalidInput("Vyplň nový název, kategorii nebo typ platby");
       }
       const rows = await withDbErrors(ENTITY, () =>
         db.update(items).set(rename).where(eq(items.id, params.id)).returning(),

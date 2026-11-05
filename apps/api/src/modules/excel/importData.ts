@@ -4,12 +4,14 @@ import {
   accountBalances,
   accounts,
   categories,
+  categoryTypes,
   counterparties,
   insurancePolicies,
   itemChanges,
   items,
   monthEntries,
   monthSettings,
+  paymentTypes,
   templates,
 } from "../../db/schema.ts";
 import { saveSettings } from "../catalog/settings.ts";
@@ -55,6 +57,42 @@ async function deleteAll(tx: Transaction): Promise<void> {
   await tx.delete(insurancePolicies);
   await tx.delete(counterparties);
   await tx.delete(accounts);
+  await tx.delete(paymentTypes);
+  await tx.delete(categoryTypes);
+}
+
+/** Typy ze sešitu (i nepoužité z listu „Typy“) a ty, na které se odkazuje. */
+async function insertTypes(
+  tx: Transaction,
+  data: ImportData,
+): Promise<{ categoryTypes: IdMap; paymentTypes: IdMap }> {
+  const unique = (names: (string | null)[]) => [
+    ...new Set(names.filter((name): name is string => name != null)),
+  ];
+  const categoryTypeNames = unique([
+    ...data.categoryTypes,
+    ...data.categories.map((c) => c.typeName),
+  ]);
+  const paymentTypeNames = unique([
+    ...data.paymentTypes,
+    ...data.items.map((i) => i.paymentTypeName),
+    ...data.entries.map((e) => e.paymentTypeName),
+  ]);
+  const insert = async (
+    table: typeof categoryTypes | typeof paymentTypes,
+    names: string[],
+  ): Promise<IdMap> => {
+    if (names.length === 0) return new Map();
+    const rows = await tx
+      .insert(table)
+      .values(names.map((name, i) => ({ name, sortOrder: i + 1 })))
+      .returning({ id: table.id, name: table.name });
+    return new Map(rows.map((row) => [row.name, row.id]));
+  };
+  return {
+    categoryTypes: await insert(categoryTypes, categoryTypeNames),
+    paymentTypes: await insert(paymentTypes, paymentTypeNames),
+  };
 }
 
 async function insertTemplates(
@@ -84,12 +122,28 @@ async function insertTemplates(
 async function insertItems(
   tx: Transaction,
   data: ImportData,
-  ids: { accounts: IdMap; counterparties: IdMap; templates: IdMap },
+  ids: {
+    accounts: IdMap;
+    counterparties: IdMap;
+    templates: IdMap;
+    paymentTypes: IdMap;
+  },
   refs: ReferenceResolver,
 ): Promise<IdMap> {
   const rows = data.items.map(
-    ({ ourAccountName, counterpartyName, templateCode, ...item }) => ({
+    ({
+      ourAccountName,
+      counterpartyName,
+      templateCode,
+      paymentTypeName,
+      ...item
+    }) => ({
       ...item,
+      paymentTypeId: refs.resolve(
+        ids.paymentTypes,
+        paymentTypeName,
+        `Položka ${item.code}, typ platby`,
+      ),
       ourAccountId: refs.resolve(
         ids.accounts,
         ourAccountName,
@@ -127,6 +181,7 @@ interface EntryIds {
   items: IdMap;
   accounts: IdMap;
   counterparties: IdMap;
+  paymentTypes: IdMap;
 }
 
 function entryRow(
@@ -146,11 +201,17 @@ function entryRow(
     itemCode: _itemCode,
     ourAccountName,
     counterpartyName,
+    paymentTypeName,
     ...values
   } = entry;
   return {
     ...values,
     itemId,
+    paymentTypeId: refs.resolve(
+      ids.paymentTypes,
+      paymentTypeName,
+      `${context}, typ platby`,
+    ),
     dueDay: validDueDay(entry.dueDay),
     ourAccountId: refs.resolve(
       ids.accounts,
@@ -271,6 +332,21 @@ export function replaceAllData(data: ImportData): Promise<ImportResult> {
         .returning({ id: counterparties.id, name: counterparties.name }),
     );
     const templateIds = await insertTemplates(tx, data, counterpartyIds, refs);
+    const typeIds = await insertTypes(tx, data);
+    if (data.categories.length > 0) {
+      await tx.insert(categories).values(
+        data.categories.map((category, i) => ({
+          direction: category.direction,
+          name: category.name,
+          sortOrder: i + 1,
+          typeId: refs.resolve(
+            typeIds.categoryTypes,
+            category.typeName,
+            `Kategorie ${category.name}, nadkategorie`,
+          ),
+        })),
+      );
+    }
     if (data.insurance.length > 0) {
       await tx.insert(insurancePolicies).values(data.insurance);
     }
@@ -281,6 +357,7 @@ export function replaceAllData(data: ImportData): Promise<ImportResult> {
         accounts: accountIds,
         counterparties: counterpartyIds,
         templates: templateIds,
+        paymentTypes: typeIds.paymentTypes,
       },
       refs,
     );
@@ -293,7 +370,12 @@ export function replaceAllData(data: ImportData): Promise<ImportResult> {
     const entryCount = await insertEntries(
       tx,
       data,
-      { items: itemIds, accounts: accountIds, counterparties: counterpartyIds },
+      {
+        items: itemIds,
+        accounts: accountIds,
+        counterparties: counterpartyIds,
+        paymentTypes: typeIds.paymentTypes,
+      },
       refs,
     );
     const balanceCount = await insertBalances(tx, data, accountIds, refs);

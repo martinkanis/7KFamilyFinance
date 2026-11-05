@@ -5,6 +5,7 @@ import type {
   MonthRow,
   OneOffInput,
   PaymentStatus,
+  PaymentType,
 } from "@kkff/api/contracts";
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ interface OneOffDialogProps {
   accounts: Account[];
   accountOptions: ComboOption[];
   counterparties: Counterparty[];
+  paymentTypes: PaymentType[];
   categories: string[];
   isSaving: boolean;
   error: unknown;
@@ -60,6 +62,7 @@ function initialForm(row: MonthRow | null, preset?: PaymentPreset) {
     name: row?.name ?? preset?.name ?? "",
     amount: toText(row?.amount ?? preset?.amount),
     counterpartyId: toText(row?.counterparty?.id ?? preset?.counterpartyId),
+    paymentTypeId: toText(row?.paymentType?.id ?? preset?.paymentTypeId),
     ourAccountId: toText(row?.overrides.ourAccountId ?? preset?.ourAccountId),
     counterpartyAccount: toText(
       row?.overrides.counterpartyAccount ?? preset?.counterpartyAccount,
@@ -94,6 +97,7 @@ function toOneOffInput(form: OneOffForm): OneOffInput | string {
     name,
     amount: amount.value,
     counterpartyId: idOrNull(form.counterpartyId),
+    paymentTypeId: idOrNull(form.paymentTypeId),
     ourAccountId: idOrNull(form.ourAccountId),
     counterpartyAccount: textOrNull(form.counterpartyAccount),
     vs: textOrNull(form.vs),
@@ -110,6 +114,7 @@ export function OneOffDialog({
   accounts,
   accountOptions,
   counterparties,
+  paymentTypes,
   categories,
   isSaving,
   error,
@@ -244,6 +249,19 @@ export function OneOffDialog({
             value={form.dueDay}
             onChange={(e) => set("dueDay")(e.target.value)}
           />
+        </Field>
+        <Field label="Typ platby">
+          <Select
+            value={form.paymentTypeId}
+            onChange={(e) => set("paymentTypeId")(e.target.value)}
+          >
+            <option value="">—</option>
+            {paymentTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field label="Protistrana">
           <Select

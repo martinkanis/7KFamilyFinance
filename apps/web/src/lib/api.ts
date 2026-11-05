@@ -8,6 +8,8 @@ import type {
   CategoryRef,
   CategoryRename,
   CategoryRenameResult,
+  CategoryType,
+  CategoryTypeAssign,
   Counterparty,
   CurrentUser,
   ExcelBalanceAssignment,
@@ -22,6 +24,7 @@ import type {
   MonthView,
   OneOffInput,
   Overview,
+  PaymentType,
   RowOrder,
   Settings,
   Template,
@@ -75,6 +78,8 @@ export interface Resources {
   templates: Template;
   insurance: InsurancePolicy;
   items: ItemWithChanges;
+  "category-types": CategoryType;
+  "payment-types": PaymentType;
 }
 
 export type Resource = keyof Resources;
@@ -109,6 +114,8 @@ export const api = {
     request<{ ok: boolean }>("PUT", "/api/categories/order", order),
   deleteCategory: (input: CategoryDelete) =>
     request<{ ok: boolean }>("POST", "/api/categories/delete", input),
+  setCategoryType: (input: CategoryTypeAssign) =>
+    request<{ ok: boolean }>("PUT", "/api/categories/type", input),
   reorderRows: (month: string, order: RowOrder) =>
     request<MonthView>("PUT", `/api/months/${month}/order`, order),
   renameCategory: (rename: CategoryRename) =>

@@ -57,6 +57,7 @@ const oneOffBody = t.Object({
   category: requiredText(),
   name: requiredText(),
   counterpartyId: nullableId,
+  paymentTypeId: t.Optional(nullableId),
 });
 
 const monthParams = t.Object({ month: monthKeySchema });

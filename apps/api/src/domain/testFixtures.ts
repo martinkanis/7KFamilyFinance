@@ -17,6 +17,7 @@ export function makeItem(overrides: Partial<Item> = {}): Item {
     ourAccountId: null,
     counterpartyId: null,
     templateId: null,
+    paymentTypeId: null,
     counterpartyAccount: null,
     vs: null,
     ks: null,
@@ -105,6 +106,7 @@ export function makeEntry(
     afterItemId: null,
     sortOrder: null,
     receivedAmount: null,
+    paymentTypeId: null,
     ...overrides,
   };
 }

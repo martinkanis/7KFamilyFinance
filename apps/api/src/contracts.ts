@@ -72,6 +72,8 @@ export interface Item {
   ourAccountId: number | null;
   counterpartyId: number | null;
   templateId: number | null;
+  /** Typ platby (vlastní seznam, např. Energie – elektřina). */
+  paymentTypeId: number | null;
   counterpartyAccount: string | null;
   vs: string | null;
   ks: string | null;
@@ -89,7 +91,21 @@ export type TemplateInput = Omit<Template, "id">;
 export type InsurancePolicyInput = Omit<InsurancePolicy, "id">;
 export type ItemInput = Omit<Item, "id">;
 /** Přejmenování položky přímo ze stránky měsíce – platí pro všechny měsíce. */
-export type ItemRename = Partial<Pick<Item, "name" | "category">>;
+/** Úprava položky přímo ze stránky měsíce (název, kategorie, typ) – platí pro všechny měsíce. */
+export type ItemRename = Partial<
+  Pick<Item, "name" | "category" | "paymentTypeId">
+>;
+
+/** Typ kategorie a typ platby – vlastní seznamy. */
+export interface CategoryType {
+  id: number;
+  name: string;
+  sortOrder: number;
+}
+
+export type PaymentType = CategoryType;
+export type CategoryTypeInput = Omit<CategoryType, "id">;
+export type PaymentTypeInput = CategoryTypeInput;
 
 /** Přejmenuje kategorii u položek i jednorázových plateb ve všech měsících. */
 export interface CategoryRename {
@@ -189,6 +205,7 @@ export interface OneOffInput extends EntryInput {
   category: string;
   name: string;
   counterpartyId: number | null;
+  paymentTypeId?: number | null;
 }
 
 export interface NamedRef {
@@ -207,6 +224,7 @@ export interface MonthRow {
   name: string;
   counterparty: (NamedRef & { web: string | null }) | null;
   template: (NamedRef & { code: string }) | null;
+  paymentType: NamedRef | null;
   ourAccount: NamedRef | null;
   counterpartyAccount: string | null;
   vs: string | null;
@@ -261,6 +279,16 @@ export interface CategoryRef {
   name: string;
 }
 
+/** Kategorie v měsíci včetně jejího typu (null = bez typu). */
+export interface CategoryInfo extends CategoryRef {
+  typeId: number | null;
+}
+
+/** Typ kategorie; null typ odebere. */
+export interface CategoryTypeAssign extends CategoryRef {
+  typeId: number | null;
+}
+
 /** Nová pozice plateb v kategorii (přetažení); přesunuté platby změní kategorii. */
 export interface RowOrder extends CategoryRef {
   rows: { kind: "item" | "oneOff"; id: number }[];
@@ -281,7 +309,7 @@ export interface MonthView {
   month: string;
   rows: MonthRow[];
   /** Všechny kategorie v pořadí, i prázdné (do nich jde platbu přetáhnout). */
-  categories: CategoryRef[];
+  categories: CategoryInfo[];
   summary: MonthSummary;
   accounts: AccountBreakdownRow[];
   correction: MonthCorrection;

@@ -42,6 +42,7 @@ function catalog(overrides: Partial<PlannerCatalog> = {}): PlannerCatalog {
     accounts: [],
     itemChanges: [],
     categories: [],
+    paymentTypes: [],
     insuranceReserve: 0,
     ...overrides,
   };
@@ -148,8 +149,8 @@ describe("pořadí kategorií a plateb", () => {
       catalog({
         items,
         categories: [
-          { direction: "expense", name: "Auto", sortOrder: 1 },
-          { direction: "expense", name: "Prázdná", sortOrder: 2 },
+          { direction: "expense", name: "Auto", sortOrder: 1, typeId: 7 },
+          { direction: "expense", name: "Prázdná", sortOrder: 2, typeId: null },
         ],
       }),
     );
@@ -158,11 +159,13 @@ describe("pořadí kategorií a plateb", () => {
       "Auto",
       "Bydlení",
     ]);
-    expect(monthCategories(index, rows).map((c) => c.name)).toEqual([
-      "Auto",
-      "Prázdná",
-      "Bydlení",
-    ]);
+    expect(monthCategories(index, rows).map((c) => [c.name, c.typeId])).toEqual(
+      [
+        ["Auto", 7],
+        ["Prázdná", null],
+        ["Bydlení", null],
+      ],
+    );
   });
 
   it("jednorázová platba stojí za položkou, za kterou ji přetáhli", () => {

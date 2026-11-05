@@ -42,6 +42,7 @@ export function oneOffInputOf(
     category: row.category,
     name: row.name,
     counterpartyId: row.counterparty?.id ?? null,
+    paymentTypeId: row.paymentType?.id ?? null,
     ...changes,
   };
 }
@@ -344,6 +345,7 @@ export function copyOf(row: MonthRow) {
     counterpartyAccount: row.counterpartyAccount,
     vs: row.vs,
     note: row.note,
+    paymentTypeId: row.paymentType?.id ?? null,
     recurring: !row.isOneOff,
   };
 }

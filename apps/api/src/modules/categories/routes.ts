@@ -1,6 +1,11 @@
 import { Elysia, t } from "elysia";
-import { requiredText } from "../../lib/schemas.ts";
-import { addCategory, deleteCategory, orderCategories } from "./service.ts";
+import { nullableId, requiredText } from "../../lib/schemas.ts";
+import {
+  addCategory,
+  deleteCategory,
+  orderCategories,
+  setCategoryType,
+} from "./service.ts";
 
 const direction = t.Union([t.Literal("expense"), t.Literal("income")]);
 const categoryName = requiredText();
@@ -29,6 +34,14 @@ export const categoryRoutes = new Elysia({ prefix: "/api/categories" })
         names: t.Array(categoryName, { maxItems: 500 }),
       }),
     },
+  )
+  .put(
+    "/type",
+    async ({ body }) => {
+      await setCategoryType({ ...body, name: body.name.trim() });
+      return { ok: true };
+    },
+    { body: t.Object({ direction, name: categoryName, typeId: nullableId }) },
   )
   .post(
     "/delete",

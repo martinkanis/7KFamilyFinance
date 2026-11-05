@@ -2,6 +2,7 @@ import type {
   Account,
   Counterparty,
   ItemWithChanges,
+  PaymentType,
   Template,
 } from "@kkff/api/contracts";
 import { useQuery } from "@tanstack/react-query";
@@ -22,6 +23,7 @@ interface Lookups {
   accounts: Account[];
   counterparties: Counterparty[];
   templates: Template[];
+  paymentTypes: PaymentType[];
   items: ItemWithChanges[];
 }
 
@@ -227,6 +229,17 @@ function itemsConfig(lookups: Lookups): CrudConfig<"items"> {
         })),
       },
       {
+        key: "paymentTypeId",
+        label: "Typ platby",
+        kind: "select",
+        numericOptions: true,
+        hint: "Seznam typů upravíš na stránce Typy plateb",
+        options: lookups.paymentTypes.map((t) => ({
+          value: String(t.id),
+          label: t.name,
+        })),
+      },
+      {
         key: "counterpartyAccount",
         label: "Účet protistrany",
         kind: "combo",
@@ -261,6 +274,10 @@ export function ItemsPage() {
     queryKey: ["counterparties"],
     queryFn: () => api.list("counterparties"),
   });
+  const paymentTypes = useQuery({
+    queryKey: ["payment-types"],
+    queryFn: () => api.list("payment-types"),
+  });
   const templates = useQuery({
     queryKey: ["templates"],
     queryFn: () => api.list("templates"),
@@ -273,6 +290,7 @@ export function ItemsPage() {
     accounts: accounts.data ?? [],
     counterparties: counterparties.data ?? [],
     templates: templates.data ?? [],
+    paymentTypes: paymentTypes.data ?? [],
     items: items.data ?? [],
   });
   return <CrudPage config={config} />;

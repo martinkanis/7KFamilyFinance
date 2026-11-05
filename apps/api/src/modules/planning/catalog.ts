@@ -10,6 +10,7 @@ import {
   items,
   monthEntries,
   monthSettings,
+  paymentTypes,
   templates,
 } from "../../db/schema.ts";
 import {
@@ -30,6 +31,7 @@ export async function loadPlannerCatalog(
     policies,
     changeRows,
     categoryRows,
+    paymentTypeRows,
   ] = await Promise.all([
     executor.select().from(items).orderBy(asc(items.sortOrder)),
     executor.select().from(templates).orderBy(asc(templates.code)),
@@ -41,6 +43,7 @@ export async function loadPlannerCatalog(
       .orderBy(asc(insurancePolicies.id)),
     executor.select().from(itemChanges),
     executor.select().from(categories).orderBy(asc(categories.sortOrder)),
+    executor.select().from(paymentTypes),
   ]);
   return {
     items: itemRows,
@@ -49,6 +52,7 @@ export async function loadPlannerCatalog(
     accounts: accountRows,
     itemChanges: changeRows,
     categories: categoryRows,
+    paymentTypes: paymentTypeRows,
     insuranceReserve: insuranceReserveOf(
       policies.map((policy) => policy.annualAmount),
     ),

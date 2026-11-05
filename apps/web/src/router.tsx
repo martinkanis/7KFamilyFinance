@@ -8,8 +8,10 @@ import { AppShell } from "@/components/AppShell";
 import { currentMonth } from "@/lib/format";
 import {
   AccountsPage,
+  CategoryTypesPage,
   CounterpartiesPage,
   InsurancePage,
+  PaymentTypesPage,
   TemplatesPage,
 } from "@/pages/CatalogPages";
 import { DataPage } from "@/pages/DataPage";
@@ -49,6 +51,16 @@ const routeTree = rootRoute.addChildren([
   }),
   createRoute({ getParentRoute, path: "/sablony", component: TemplatesPage }),
   createRoute({ getParentRoute, path: "/pojistky", component: InsurancePage }),
+  createRoute({
+    getParentRoute,
+    path: "/nadkategorie",
+    component: CategoryTypesPage,
+  }),
+  createRoute({
+    getParentRoute,
+    path: "/typy-plateb",
+    component: PaymentTypesPage,
+  }),
   createRoute({ getParentRoute, path: "/data", component: DataPage }),
 ]);
 

@@ -1,4 +1,8 @@
-import type { MonthRow, PaymentStatus } from "@kkff/api/contracts";
+import type {
+  CategoryType,
+  MonthRow,
+  PaymentStatus,
+} from "@kkff/api/contracts";
 import { ArrowDown, ArrowUp, Copy, Pencil, Plus, QrCode } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +26,7 @@ import {
   AccountCell,
   AmountCell,
   CategoryName,
+  CategoryTypeCell,
   DetailCells,
   DueCell,
   NameCell,
@@ -64,6 +69,10 @@ interface RowActions extends RowEditing {
 }
 
 interface CategoryActions {
+  categoryTypes: CategoryType[];
+  /** Nadkategorie kategorie (null = žádná). */
+  categoryTypeOf: (category: string) => number | null;
+  onSetCategoryType: (category: string, typeId: number | null) => void;
   onAddCategory: (name: string) => void;
   onAddPayment: (category: string) => void;
   onDeleteCategory: (category: string, isEmpty: boolean) => void;
@@ -200,7 +209,12 @@ function PaymentRow({
               onRename={editing.onRename}
               onInvalid={editing.onInvalid}
             />
-            <DetailCells {...cell} accountOptions={editing.accountOptions} />
+            <DetailCells
+              {...cell}
+              accountOptions={editing.accountOptions}
+              paymentTypes={editing.paymentTypes}
+              onSetPaymentType={editing.onSetPaymentType}
+            />
           </div>
         </div>
       </td>
@@ -299,7 +313,12 @@ function PaymentCard({
             onRename={editing.onRename}
             onInvalid={editing.onInvalid}
           />
-          <DetailCells {...cell} accountOptions={editing.accountOptions} />
+          <DetailCells
+            {...cell}
+            accountOptions={editing.accountOptions}
+            paymentTypes={editing.paymentTypes}
+            onSetPaymentType={editing.onSetPaymentType}
+          />
           <div className="mt-1 flex flex-wrap items-baseline gap-x-1 text-xs text-slate-500">
             <AccountCell {...cell} accounts={editing.accounts} />
             <span
@@ -360,7 +379,14 @@ function remainingLabel(group: CategoryGroup): string {
 
 interface GroupProps
   extends RowActions,
-    Pick<CategoryActions, "onDeleteCategory" | "onAddPayment"> {
+    Pick<
+      CategoryActions,
+      | "onDeleteCategory"
+      | "onAddPayment"
+      | "categoryTypes"
+      | "categoryTypeOf"
+      | "onSetCategoryType"
+    > {
   group: CategoryGroup;
   isEmpty: boolean;
   number: number | null;
@@ -417,7 +443,7 @@ function CardGroup({ group, isEmpty, number, ...actions }: GroupProps) {
         ref={dnd.setNodeRef}
         {...dnd.listeners}
         className={cn(
-          "mb-1.5 flex items-center justify-between gap-1 rounded-lg px-1 text-sm select-none [-webkit-touch-callout:none]",
+          "group mb-1.5 flex items-center justify-between gap-1 rounded-lg px-1 text-sm select-none [-webkit-touch-callout:none]",
           dnd.drop && DROP_LINE[dnd.drop],
         )}
       >
@@ -432,6 +458,13 @@ function CardGroup({ group, isEmpty, number, ...actions }: GroupProps) {
             number={number}
             onRenameCategory={actions.onRenameCategory}
             onInvalid={actions.onInvalid}
+          />
+          <CategoryTypeCell
+            typeId={actions.categoryTypeOf(group.category)}
+            categoryTypes={actions.categoryTypes}
+            onPick={(typeId) =>
+              actions.onSetCategoryType(group.category, typeId)
+            }
           />
         </span>
         <span className="shrink-0 text-xs text-slate-500">
@@ -467,7 +500,7 @@ function TableGroup({ group, isEmpty, number, ...actions }: GroupProps) {
         ref={dnd.setNodeRef}
         {...dnd.listeners}
         className={cn(
-          "bg-brand-50 text-sm font-semibold text-brand-700",
+          "group bg-brand-50 text-sm font-semibold text-brand-700",
           dnd.drop && DROP_LINE[dnd.drop],
         )}
       >
@@ -482,6 +515,13 @@ function TableGroup({ group, isEmpty, number, ...actions }: GroupProps) {
               number={number}
               onRenameCategory={actions.onRenameCategory}
               onInvalid={actions.onInvalid}
+            />
+            <CategoryTypeCell
+              typeId={actions.categoryTypeOf(group.category)}
+              categoryTypes={actions.categoryTypes}
+              onPick={(typeId) =>
+                actions.onSetCategoryType(group.category, typeId)
+              }
             />
           </div>
         </td>
@@ -630,6 +670,9 @@ function Cards(props: ViewProps) {
           {...actions}
           onDeleteCategory={props.onDeleteCategory}
           onAddPayment={props.onAddPayment}
+          categoryTypes={props.categoryTypes}
+          categoryTypeOf={props.categoryTypeOf}
+          onSetCategoryType={props.onSetCategoryType}
         />
       ))}
     </section>
@@ -679,6 +722,9 @@ function Table(props: ViewProps) {
             {...actions}
             onDeleteCategory={props.onDeleteCategory}
             onAddPayment={props.onAddPayment}
+            categoryTypes={props.categoryTypes}
+            categoryTypeOf={props.categoryTypeOf}
+            onSetCategoryType={props.onSetCategoryType}
           />
         ))}
         {groups.length === 0 && (

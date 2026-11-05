@@ -339,6 +339,14 @@ export function MonthPage() {
     queryKey: ["counterparties"],
     queryFn: () => api.list("counterparties"),
   });
+  const categoryTypes = useQuery({
+    queryKey: ["category-types"],
+    queryFn: () => api.list("category-types"),
+  });
+  const paymentTypes = useQuery({
+    queryKey: ["payment-types"],
+    queryFn: () => api.list("payment-types"),
+  });
   const queryClient = useQueryClient();
   const save = useMonthMutation(month);
   const [filters, setFilters] = useState<Filters>({
@@ -584,13 +592,24 @@ export function MonthPage() {
       target.after,
     );
     if (!names) return;
-    updateView((current) => ({
-      ...current,
-      categories: [
-        ...current.categories.filter((c) => c.direction !== direction),
-        ...names.map((name) => ({ direction, name })),
-      ],
-    }));
+    updateView((current) => {
+      const typeOf = new Map(
+        current.categories
+          .filter((c) => c.direction === direction)
+          .map((c) => [c.name, c.typeId]),
+      );
+      return {
+        ...current,
+        categories: [
+          ...current.categories.filter((c) => c.direction !== direction),
+          ...names.map((name) => ({
+            direction,
+            name,
+            typeId: typeOf.get(name) ?? null,
+          })),
+        ],
+      };
+    });
     saveLayout(() => api.orderCategories({ direction, names }));
   };
 
@@ -602,7 +621,7 @@ export function MonthPage() {
     }
     updateView((current) => ({
       ...current,
-      categories: [...current.categories, { direction, name }],
+      categories: [...current.categories, { direction, name, typeId: null }],
     }));
     saveLayout(() => api.addCategory({ direction, name }));
   };
@@ -637,8 +656,54 @@ export function MonthPage() {
     accounts.data ?? [],
   );
 
+  /** Typ platby: u pravidelné platby na položce (všechny měsíce), u jednorázové jen u ní. */
+  const setPaymentType = (row: MonthRow, typeId: number | null) => {
+    setInvalidEdit(null);
+    const type = (paymentTypes.data ?? []).find((t) => t.id === typeId);
+    updateView((current) =>
+      withRow(current, row.key, (r) => ({
+        ...r,
+        paymentType: type ? { id: type.id, name: type.name } : null,
+      })),
+    );
+    const { itemId, entryId } = row;
+    save.mutate(async () => {
+      if (row.isOneOff && entryId != null) {
+        return api.updateOneOff(
+          month,
+          entryId,
+          oneOffInputOf(row, { paymentTypeId: typeId }),
+        );
+      }
+      if (itemId == null) throw new MissingRowIdError(row);
+      await api.renameItem(itemId, { paymentTypeId: typeId });
+      refreshOtherMonths();
+      return api.month(month);
+    });
+  };
+
+  const categoryTypeOf = (category: string) =>
+    view.data.categories.find(
+      (c) => c.direction === direction && c.name === category,
+    )?.typeId ?? null;
+
+  const setCategoryType = (category: string, typeId: number | null) => {
+    setInvalidEdit(null);
+    updateView((current) => ({
+      ...current,
+      categories: current.categories.map((c) =>
+        c.direction === direction && c.name === category ? { ...c, typeId } : c,
+      ),
+    }));
+    saveLayout(() =>
+      api.setCategoryType({ direction, name: category, typeId }),
+    );
+  };
+
   const tableProps = {
     today: todayIso(),
+    paymentTypes: paymentTypes.data ?? [],
+    onSetPaymentType: setPaymentType,
     accounts: accounts.data ?? [],
     accountOptions,
     onChange: changeRow,
@@ -668,6 +733,8 @@ export function MonthPage() {
         view={view.data}
         previous={previousView.data}
         direction={direction}
+        categoryTypes={categoryTypes.data ?? []}
+        paymentTypes={paymentTypes.data ?? []}
       />
 
       {view.data.rows.length === 0 ? (
@@ -708,6 +775,9 @@ export function MonthPage() {
               sort={sort}
               onSortChange={setSort}
               onAddCategory={addCategory}
+              categoryTypes={categoryTypes.data ?? []}
+              categoryTypeOf={categoryTypeOf}
+              onSetCategoryType={setCategoryType}
               onAddPayment={(category) =>
                 setEditing({
                   kind: "oneOff",
@@ -748,6 +818,7 @@ export function MonthPage() {
           accounts={accounts.data ?? []}
           accountOptions={accountOptions}
           counterparties={counterparties.data ?? []}
+          paymentTypes={paymentTypes.data ?? []}
           categories={categories}
           isSaving={save.isPending}
           error={save.error}
