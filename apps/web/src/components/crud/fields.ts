@@ -15,7 +15,9 @@ export type FieldKind =
   | "date"
   | "checkbox"
   | "select"
-  | "datalist";
+  | "datalist"
+  /** Text, který jde i vybrat z nabídky filtrované psaním (popisek + hodnota). */
+  | "combo";
 
 export interface Option {
   value: string;

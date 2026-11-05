@@ -7,8 +7,16 @@ import type {
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage } from "@/components/ui/card";
+import { ComboInput } from "@/components/ui/combo-input";
 import { Dialog } from "@/components/ui/dialog";
-import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import {
+  Field,
+  INPUT_CLASSES,
+  Input,
+  Select,
+  Textarea,
+} from "@/components/ui/field";
+import type { ComboOption } from "@/lib/accountOptions";
 import { operatingAccountsWith } from "@/lib/accounts";
 import { formatMoney, STATUS_LABELS } from "@/lib/format";
 import {
@@ -23,6 +31,7 @@ import { AccountOptions, StatusOptions } from "./options";
 interface EntryDialogProps {
   row: MonthRow;
   accounts: Account[];
+  accountOptions: ComboOption[];
   isSaving: boolean;
   error: unknown;
   /** `forward` = vyplněné hodnoty platí i pro další měsíce (změna položky). */
@@ -75,6 +84,7 @@ function amountHint(row: MonthRow): string {
 export function EntryDialog({
   row,
   accounts,
+  accountOptions,
   isSaving,
   error,
   onSave,
@@ -223,9 +233,12 @@ export function EntryDialog({
               : `Výchozí ${row.counterpartyAccount ?? "–"}`
           }
         >
-          <Input
+          <ComboInput
             value={form.counterpartyAccount}
-            onChange={(e) => set("counterpartyAccount")(e.target.value)}
+            options={accountOptions}
+            onChange={set("counterpartyAccount")}
+            placeholder="Napiš nebo vyber"
+            className={INPUT_CLASSES}
           />
         </Field>
         <Field

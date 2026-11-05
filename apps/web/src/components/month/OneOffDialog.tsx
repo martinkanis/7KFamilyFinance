@@ -9,8 +9,16 @@ import type {
 import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage } from "@/components/ui/card";
+import { ComboInput } from "@/components/ui/combo-input";
 import { Dialog } from "@/components/ui/dialog";
-import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import {
+  Field,
+  INPUT_CLASSES,
+  Input,
+  Select,
+  Textarea,
+} from "@/components/ui/field";
+import type { ComboOption } from "@/lib/accountOptions";
 import { operatingAccountsWith } from "@/lib/accounts";
 import {
   idOrNull,
@@ -33,6 +41,7 @@ interface OneOffDialogProps {
   row: MonthRow | null;
   preset?: PaymentPreset;
   accounts: Account[];
+  accountOptions: ComboOption[];
   counterparties: Counterparty[];
   categories: string[];
   isSaving: boolean;
@@ -94,6 +103,7 @@ export function OneOffDialog({
   row,
   preset,
   accounts,
+  accountOptions,
   counterparties,
   categories,
   isSaving,
@@ -256,9 +266,12 @@ export function OneOffDialog({
           label="Účet protistrany"
           hint="Prázdné = účet vybrané protistrany"
         >
-          <Input
+          <ComboInput
             value={form.counterpartyAccount}
-            onChange={(e) => set("counterpartyAccount")(e.target.value)}
+            options={accountOptions}
+            onChange={set("counterpartyAccount")}
+            placeholder="Napiš nebo vyber"
+            className={INPUT_CLASSES}
           />
         </Field>
         <Field label="VS">

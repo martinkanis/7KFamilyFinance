@@ -7,6 +7,7 @@ import type {
 import { useQuery } from "@tanstack/react-query";
 import { type CrudConfig, CrudPage } from "@/components/crud/CrudPage";
 import { ItemChanges } from "@/components/crud/ItemChanges";
+import { counterpartyAccountOptions } from "@/lib/accountOptions";
 import { operatingAccountsWith } from "@/lib/accounts";
 import { api } from "@/lib/api";
 import {
@@ -228,7 +229,11 @@ function itemsConfig(lookups: Lookups): CrudConfig<"items"> {
       {
         key: "counterpartyAccount",
         label: "Účet protistrany",
-        kind: "text",
+        kind: "combo",
+        options: counterpartyAccountOptions(
+          lookups.counterparties,
+          lookups.accounts,
+        ),
         hint: "Prázdné = ze šablony / protistrany",
       },
       { key: "vs", label: "VS", kind: "text" },

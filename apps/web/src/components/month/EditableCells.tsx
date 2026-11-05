@@ -1,6 +1,7 @@
 import type { Account, EntryInput, MonthRow } from "@kkff/api/contracts";
 import { ExternalLink } from "lucide-react";
 import { EditableSelect, EditableText } from "@/components/ui/editable";
+import type { ComboOption } from "@/lib/accountOptions";
 import { operatingAccountsWith } from "@/lib/accounts";
 import { cn } from "@/lib/cn";
 import { formatDate, formatMoney, safeUrl } from "@/lib/format";
@@ -15,6 +16,8 @@ import {
 /** Úpravy přímo v tabulce; měsíční hodnoty platí jen pro tento měsíc, název a kategorie všude. */
 export interface RowEditing {
   accounts: Account[];
+  /** Nabídka pro „účet protistrany“ (protistrany a naše účty). */
+  accountOptions: ComboOption[];
   onChange: (row: MonthRow, changes: Partial<EntryInput>) => void;
   onRename: (row: MonthRow, name: string) => void;
   onRenameCategory: (from: string, to: string) => void;
@@ -111,12 +114,17 @@ function Counterparty({ row }: { row: MonthRow }) {
 }
 
 /** Druhý řádek: protistrana, její účet, VS, šablona a poznámka. */
-export function DetailCells({ row, onChange }: CellProps) {
+export function DetailCells({
+  row,
+  onChange,
+  accountOptions,
+}: CellProps & Pick<RowEditing, "accountOptions">) {
   const textCell = (
     field: "counterpartyAccount" | "vs" | "note",
     label: string,
     placeholder: string,
     className?: string,
+    options?: RowEditing["accountOptions"],
   ) => {
     const value = toText(row[field]);
     return (
@@ -127,6 +135,7 @@ export function DetailCells({ row, onChange }: CellProps) {
           placeholder={placeholder}
           inputMode={field === "vs" ? "numeric" : undefined}
           className={className}
+          options={options}
           onCommit={(text) => onChange(row, { [field]: textOrNull(text) })}
         >
           {field === "vs" && value !== "" ? `VS ${value}` : undefined}
@@ -142,6 +151,7 @@ export function DetailCells({ row, onChange }: CellProps) {
         "Účet protistrany",
         "+ účet protistrany",
         "font-mono break-all",
+        accountOptions,
       )}
       {textCell("vs", "Variabilní symbol", "+ VS", "font-mono")}
       {row.template && (

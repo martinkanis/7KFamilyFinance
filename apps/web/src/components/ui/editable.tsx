@@ -6,7 +6,9 @@ import {
   useRef,
   useState,
 } from "react";
+import type { ComboOption } from "@/lib/accountOptions";
 import { cn } from "@/lib/cn";
+import { ComboInput } from "./combo-input";
 
 // Buňky upravitelné přímo v tabulce jako v Excelu: vypadají jako text,
 // po kliknutí (nebo začátku psaní) se z nich stane pole.
@@ -37,6 +39,8 @@ interface EditableTextProps {
   inputMode?: "text" | "decimal" | "numeric";
   align?: "left" | "right";
   className?: string;
+  /** Nabídka k výběru (filtruje se psaním); hodnotu jde i napsat. */
+  options?: ComboOption[];
   /** Zavolá se jen při skutečné změně textu. */
   onCommit: (text: string) => void;
 }
@@ -56,6 +60,7 @@ export function EditableText({
   inputMode,
   align = "left",
   className,
+  options,
   onCommit,
 }: EditableTextProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -81,13 +86,39 @@ export function EditableText({
     setDraft({ text, selectAll });
   };
 
-  const finish = (save: boolean, keepFocus: boolean) => {
-    if (finished.current || !draft) return;
+  const finish = (save: boolean, keepFocus: boolean, text = draft?.text) => {
+    if (finished.current || text == null) return;
     finished.current = true;
-    if (save && draft.text.trim() !== value.trim()) onCommit(draft.text);
+    if (save && text.trim() !== value.trim()) onCommit(text);
     returnFocus.current = keepFocus;
     setDraft(null);
   };
+
+  const onEditorKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finish(true, true);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      finish(false, true);
+    }
+  };
+
+  if (draft && options) {
+    return (
+      <ComboInput
+        inputRef={inputRef}
+        aria-label={label}
+        value={draft.text}
+        options={options}
+        onChange={(text) => setDraft({ text, selectAll: false })}
+        onPick={(picked) => finish(true, true, picked)}
+        onBlur={() => finish(true, false)}
+        onKeyDown={onEditorKeyDown}
+        className={cn(EDITOR, "min-w-48", className)}
+      />
+    );
+  }
 
   if (draft) {
     return (
@@ -101,15 +132,7 @@ export function EditableText({
           setDraft({ text: event.target.value, selectAll: false })
         }
         onBlur={() => finish(true, false)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            finish(true, true);
-          } else if (event.key === "Escape") {
-            event.preventDefault();
-            finish(false, true);
-          }
-        }}
+        onKeyDown={onEditorKeyDown}
         className={cn(EDITOR, align === "right" && "text-right", className)}
       />
     );

@@ -198,7 +198,7 @@ function PaymentRow({
               onRename={editing.onRename}
               onInvalid={editing.onInvalid}
             />
-            <DetailCells {...cell} />
+            <DetailCells {...cell} accountOptions={editing.accountOptions} />
           </div>
         </div>
       </td>
@@ -294,7 +294,7 @@ function PaymentCard({
             onRename={editing.onRename}
             onInvalid={editing.onInvalid}
           />
-          <DetailCells {...cell} />
+          <DetailCells {...cell} accountOptions={editing.accountOptions} />
           <div className="mt-1 flex flex-wrap items-baseline gap-x-1 text-xs text-slate-500">
             <AccountCell {...cell} accounts={editing.accounts} />
             <span

@@ -42,6 +42,7 @@ import { QrPayDialog } from "@/components/month/QrPayDialog";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card, ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/field";
+import { counterpartyAccountOptions } from "@/lib/accountOptions";
 import { operatingAccountsWith } from "@/lib/accounts";
 import { api } from "@/lib/api";
 import {
@@ -631,9 +632,15 @@ export function MonthPage() {
     }
   };
 
+  const accountOptions = counterpartyAccountOptions(
+    counterparties.data ?? [],
+    accounts.data ?? [],
+  );
+
   const tableProps = {
     today: todayIso(),
     accounts: accounts.data ?? [],
+    accountOptions,
     onChange: changeRow,
     onRename: renameRow,
     onRenameCategory: renameCategory,
@@ -727,6 +734,7 @@ export function MonthPage() {
         <EntryDialog
           row={editing.row}
           accounts={accounts.data ?? []}
+          accountOptions={accountOptions}
           isSaving={save.isPending}
           error={save.error}
           onSave={onSaveEntry(editing.row)}
@@ -738,6 +746,7 @@ export function MonthPage() {
           row={editing.row}
           preset={editing.preset}
           accounts={accounts.data ?? []}
+          accountOptions={accountOptions}
           counterparties={counterparties.data ?? []}
           categories={categories}
           isSaving={save.isPending}

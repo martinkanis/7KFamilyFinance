@@ -12,6 +12,9 @@ const CONTROL =
   "placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 " +
   "disabled:bg-slate-100";
 
+/** Vzhled textového pole pro vlastní ovládací prvky (např. pole s nabídkou). */
+export const INPUT_CLASSES = cn(CONTROL, "h-10");
+
 export function Input({
   className,
   ...props

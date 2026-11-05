@@ -3,11 +3,13 @@ import { Copy, Plus, Search } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage, Loading, PageHeader } from "@/components/ui/card";
+import { ComboInput } from "@/components/ui/combo-input";
 import { DeleteButton } from "@/components/ui/delete-button";
 import { Dialog } from "@/components/ui/dialog";
 import {
   Checkbox,
   Field,
+  INPUT_CLASSES,
   Input,
   Select,
   Textarea,
@@ -130,6 +132,19 @@ function FieldControl<T>({
             </option>
           ))}
         </Select>
+      )}
+      {field.kind === "combo" && (
+        <ComboInput
+          value={text}
+          options={
+            typeof field.options === "function"
+              ? field.options(values)
+              : (field.options ?? [])
+          }
+          onChange={onChange}
+          placeholder={field.placeholder ?? "Napiš nebo vyber"}
+          className={INPUT_CLASSES}
+        />
       )}
       {field.kind === "datalist" && (
         <>
