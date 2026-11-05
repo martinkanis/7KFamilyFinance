@@ -90,8 +90,16 @@ function DirectionStat({
   );
 }
 
+function signed(amount: number): string {
+  return `${amount > 0 ? "+" : ""}${formatMoney(amount)}`;
+}
+
 function BalanceStat({ view }: { view: MonthView }) {
-  const { balance, savings, wealthChange } = view.summary;
+  const { balance, savings, wealthChange, income, expense } = view.summary;
+  // K dnešku = co už přišlo − co už je zaplacené (podle stavů a částečného plnění);
+  // spolu se zbytkem do konce měsíce dá plánovanou bilanci.
+  const today = income.paid - expense.paid;
+  const ahead = income.remaining - expense.remaining;
   return (
     <div className="col-span-2 md:col-span-1">
       <div className="text-sm text-slate-500">Bilance (plán)</div>
@@ -113,6 +121,37 @@ function BalanceStat({ view }: { view: MonthView }) {
           <dd className="font-semibold tabular-nums">
             {formatMoney(wealthChange)}
           </dd>
+        </div>
+      </dl>
+      <dl className="mt-2 space-y-0.5 border-t border-slate-100 pt-2 text-xs">
+        <div className="flex justify-between gap-3">
+          <dt
+            className="text-slate-500"
+            title="Co už přišlo minus co už je zaplacené"
+          >
+            Bilance k dnešku
+          </dt>
+          <dd
+            className={cn(
+              "font-semibold tabular-nums",
+              today < 0 ? "text-rose-700" : "text-emerald-700",
+            )}
+          >
+            {signed(today)}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt
+            className="text-slate-500"
+            title="Co ještě má přijít minus co ještě zbývá zaplatit"
+          >
+            Do konce měsíce ještě
+          </dt>
+          <dd className="tabular-nums">{signed(ahead)}</dd>
+        </div>
+        <div className="text-slate-400 tabular-nums">
+          přišlo {formatMoney(income.paid)} · zaplaceno{" "}
+          {formatMoney(expense.paid)}
         </div>
       </dl>
     </div>
