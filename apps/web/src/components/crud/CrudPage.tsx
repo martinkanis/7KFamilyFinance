@@ -299,7 +299,36 @@ interface RowsProps<R extends Resource> {
   rows: Resources[R][];
   onOpen: (row: Resources[R]) => void;
   onDelete: (row: Resources[R]) => void;
+  onDuplicate: (row: Resources[R]) => void;
 }
+
+/** Ikona kopie u řádku; klik se nepropíše do řádku (ten by otevřel úpravu). */
+function DuplicateButton({
+  label,
+  onDuplicate,
+}: {
+  label: string;
+  onDuplicate: () => void;
+}) {
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      title={label}
+      aria-label={label}
+      onClick={(event) => {
+        event.stopPropagation();
+        onDuplicate();
+      }}
+      onKeyDown={(event) => event.stopPropagation()}
+      className="text-slate-400 hover:text-slate-700"
+    >
+      <Copy className="size-5 md:size-4" />
+    </Button>
+  );
+}
+
+const duplicateLabel = (row: { name: string }) => `Duplikovat „${row.name}“`;
 
 const deleteLabel = (accusative: string, row: { name: string }) =>
   `Smazat ${accusative} „${row.name}“`;
@@ -309,6 +338,7 @@ function CrudCards<R extends Resource>({
   rows,
   onOpen,
   onDelete,
+  onDuplicate,
 }: RowsProps<R>) {
   const [titleColumn, ...detailColumns] = config.columns;
   if (rows.length === 0) {
@@ -337,7 +367,11 @@ function CrudCards<R extends Resource>({
               <div className="min-w-0 font-medium">
                 {titleColumn?.render(row)}
               </div>
-              <div className="-mt-1 -mr-1 shrink-0">
+              <div className="-mt-1 -mr-1 flex shrink-0">
+                <DuplicateButton
+                  label={duplicateLabel(row)}
+                  onDuplicate={() => onDuplicate(row)}
+                />
                 <DeleteButton
                   label={deleteLabel(config.accusative, row)}
                   onDelete={() => onDelete(row)}
@@ -363,7 +397,7 @@ function CrudCards<R extends Resource>({
 }
 
 function CrudTable<R extends Resource>(props: RowsProps<R>) {
-  const { config, rows, onOpen, onDelete } = props;
+  const { config, rows, onOpen, onDelete, onDuplicate } = props;
   return (
     <>
       <CrudCards {...props} />
@@ -382,8 +416,8 @@ function CrudTable<R extends Resource>(props: RowsProps<R>) {
                   {column.label}
                 </th>
               ))}
-              <th className="w-12 px-3 py-2.5">
-                <span className="sr-only">Smazat</span>
+              <th className="w-24 px-3 py-2.5">
+                <span className="sr-only">Akce</span>
               </th>
             </tr>
           </thead>
@@ -408,7 +442,11 @@ function CrudTable<R extends Resource>(props: RowsProps<R>) {
                     {column.render(row)}
                   </td>
                 ))}
-                <td className="px-2 py-1 text-right align-top">
+                <td className="px-2 py-1 text-right align-top whitespace-nowrap">
+                  <DuplicateButton
+                    label={duplicateLabel(row)}
+                    onDuplicate={() => onDuplicate(row)}
+                  />
                   <DeleteButton
                     label={deleteLabel(config.accusative, row)}
                     onDelete={() => onDelete(row)}
@@ -454,6 +492,8 @@ export function CrudPage<R extends Resource>({
     setEditing({ key: Date.now(), row, initial });
   const openRow = (row: Resources[R]) =>
     open(row, formFromRow(config.fields, row));
+  const duplicateRow = (row: Resources[R]) =>
+    open(null, copyOf(config, formFromRow(config.fields, row)));
   const deleteRow = (row: Resources[R]) => {
     if (confirmDelete(config, row)) remove.mutate(row.id);
   };
@@ -496,6 +536,7 @@ export function CrudPage<R extends Resource>({
           rows={rows}
           onOpen={openRow}
           onDelete={deleteRow}
+          onDuplicate={duplicateRow}
         />
       )}
       {list.data &&
@@ -512,6 +553,7 @@ export function CrudPage<R extends Resource>({
               rows={rows.filter(section.includes)}
               onOpen={openRow}
               onDelete={deleteRow}
+              onDuplicate={duplicateRow}
             />
           </section>
         ))}
