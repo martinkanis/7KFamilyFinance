@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/field";
 import type { ComboOption } from "@/lib/accountOptions";
 import { operatingAccountsWith } from "@/lib/accounts";
+import { PARTIAL_LABELS } from "@/lib/format";
 import {
   idOrNull,
   parseOptionalDay,
@@ -77,7 +78,7 @@ type OneOffForm = ReturnType<typeof initialForm>;
 function toOneOffInput(form: OneOffForm): OneOffInput | string {
   const amount = parseOptionalNumber(form.amount, "Částka");
   const dueDay = parseOptionalDay(form.dueDay);
-  const received = parseOptionalNumber(form.receivedAmount, "Přišlo zatím");
+  const received = parseOptionalNumber(form.receivedAmount, "Částečné plnění");
   if (!amount.ok) return amount.error;
   if (!dueDay.ok) return dueDay.error;
   if (!received.ok) return received.error;
@@ -301,10 +302,10 @@ export function OneOffDialog({
             onChange={(e) => set("paidOn")(e.target.value)}
           />
         </Field>
-        {form.direction === "income" && form.status !== "paid" && (
+        {form.status !== "paid" && (
           <Field
-            label="Přišlo zatím (částečně)"
-            hint="Kolik z příjmu už přišlo; prázdné = nic"
+            label={PARTIAL_LABELS[form.direction].field}
+            hint={PARTIAL_LABELS[form.direction].hint}
           >
             <Input
               inputMode="decimal"

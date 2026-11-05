@@ -5,7 +5,7 @@ import type { ComboOption } from "@/lib/accountOptions";
 import { operatingAccountsWith } from "@/lib/accounts";
 import { numberedCategory } from "@/lib/categoryNumbers";
 import { cn } from "@/lib/cn";
-import { formatDate, formatMoney, safeUrl } from "@/lib/format";
+import { formatDate, formatMoney, PARTIAL_LABELS, safeUrl } from "@/lib/format";
 import {
   idOrNull,
   parseOptionalDay,
@@ -267,23 +267,25 @@ export function PaidOnCell({ row, onChange }: CellProps) {
 }
 
 /**
- * Částečné plnění příjmu: kolik zatím přišlo. Celá částka (nebo víc)
- * platbu rovnou označí jako přijatou.
+ * Částečné plnění: kolik z příjmu zatím přišlo, nebo kolik z výdaje
+ * (např. rozpočtu na jídlo) už je utracené. Celá částka (nebo víc) platbu
+ * rovnou označí jako vyřízenou.
  */
 export function ReceivedCell({ row, onChange, onInvalid }: CellProps) {
-  if (row.direction !== "income" || row.status === "paid" || row.amount === 0) {
+  if (row.status === "paid" || row.amount === 0) {
     return null;
   }
   const received = row.receivedAmount;
+  const labels = PARTIAL_LABELS[row.direction];
   return (
     <span className={cn("text-xs", received == null && REVEAL_ON_ROW)}>
       <EditableText
         value={toText(received)}
-        label="Přišlo zatím (částečně)"
-        placeholder="+ přišlo částečně"
+        label={labels.field}
+        placeholder={`+ ${labels.done} částečně`}
         inputMode="decimal"
         onCommit={(text) => {
-          const parsed = parseOptionalNumber(text, "Přišlo zatím");
+          const parsed = parseOptionalNumber(text, labels.field);
           if (!parsed.ok) {
             onInvalid(parsed.error);
           } else if (parsed.value != null && parsed.value >= row.amount) {
@@ -302,7 +304,7 @@ export function ReceivedCell({ row, onChange, onInvalid }: CellProps) {
       >
         {received != null && (
           <span className="font-medium text-emerald-700">
-            přišlo {formatMoney(received)} z {formatMoney(row.amount)}
+            {labels.done} {formatMoney(received)} z {formatMoney(row.amount)}
           </span>
         )}
       </EditableText>

@@ -63,7 +63,7 @@ const MONTH_HEADERS = [
   "",
   "Směr",
   "Kategorie",
-  "Částečně přišlo",
+  "Částečně (přišlo / utraceno)",
 ];
 
 const VISIBLE_WIDTH = 12;

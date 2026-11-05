@@ -80,3 +80,17 @@ export function todayIso(today: Date = new Date()): string {
 export function safeUrl(url: string | null): string | null {
   return url && /^https?:\/\//i.test(url) ? url : null;
 }
+
+/** Popisky částečného plnění: u příjmu „přišlo“, u výdaje „utraceno“ (čerpání rozpočtu). */
+export const PARTIAL_LABELS = {
+  income: {
+    done: "přišlo",
+    field: "Přišlo zatím (částečně)",
+    hint: "Kolik z příjmu už přišlo; prázdné = nic",
+  },
+  expense: {
+    done: "utraceno",
+    field: "Utraceno zatím (čerpání)",
+    hint: "Kolik z částky už je utracené, např. z rozpočtu na jídlo; prázdné = nic",
+  },
+} as const;

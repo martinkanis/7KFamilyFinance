@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/field";
 import type { ComboOption } from "@/lib/accountOptions";
 import { operatingAccountsWith } from "@/lib/accounts";
-import { formatMoney, STATUS_LABELS } from "@/lib/format";
+import { formatMoney, PARTIAL_LABELS, STATUS_LABELS } from "@/lib/format";
 import {
   idOrNull,
   parseOptionalDay,
@@ -58,7 +58,7 @@ type EntryForm = ReturnType<typeof initialForm>;
 function toEntryInput(form: EntryForm): EntryInput | string {
   const amount = parseOptionalNumber(form.amount, "Částka");
   const dueDay = parseOptionalDay(form.dueDay);
-  const received = parseOptionalNumber(form.receivedAmount, "Přišlo zatím");
+  const received = parseOptionalNumber(form.receivedAmount, "Částečné plnění");
   if (!amount.ok) return amount.error;
   if (!dueDay.ok) return dueDay.error;
   if (!received.ok) return received.error;
@@ -255,10 +255,10 @@ export function EntryDialog({
             onChange={(e) => set("vs")(e.target.value)}
           />
         </Field>
-        {row.direction === "income" && form.status !== "paid" && (
+        {form.status !== "paid" && (
           <Field
-            label="Přišlo zatím (částečně)"
-            hint="Kolik z příjmu už přišlo; prázdné = nic"
+            label={PARTIAL_LABELS[row.direction].field}
+            hint={PARTIAL_LABELS[row.direction].hint}
           >
             <Input
               inputMode="decimal"
