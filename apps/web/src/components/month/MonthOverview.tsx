@@ -149,7 +149,15 @@ function BalanceStat({ view }: { view: MonthView }) {
           >
             Do konce měsíce ještě
           </dt>
-          <dd className="tabular-nums">{signed(ahead)}</dd>
+          <dd
+            className={cn(
+              "font-semibold tabular-nums",
+              ahead > 0 && "text-emerald-700",
+              ahead < 0 && "text-rose-700",
+            )}
+          >
+            {signed(ahead)}
+          </dd>
         </div>
         <div className="text-slate-400 tabular-nums">
           přišlo {formatMoney(income.paid)} · zaplaceno{" "}

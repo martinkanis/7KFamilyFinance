@@ -41,7 +41,7 @@ function Donut({
         <p className="mt-3 text-sm text-slate-500">Nic k zobrazení</p>
       ) : (
         <>
-          <div className="relative mx-auto mt-2 h-48 w-48">
+          <div className="relative mx-auto mt-3 aspect-square w-full max-w-72">
             <ResponsiveContainer>
               <PieChart>
                 <Pie
@@ -67,10 +67,10 @@ function Donut({
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="text-xs text-slate-500">{center.label}</span>
+              <span className="text-sm text-slate-500">{center.label}</span>
               <span
                 className={cn(
-                  "text-sm font-semibold tabular-nums",
+                  "text-xl font-semibold tabular-nums",
                   centerTone === "good" && "text-emerald-700",
                   centerTone === "bad" && "text-rose-700",
                 )}
@@ -79,7 +79,7 @@ function Donut({
               </span>
             </div>
           </div>
-          <ul className="mt-3 space-y-1 text-xs">
+          <ul className="mt-4 space-y-1 text-sm">
             {slices.map((slice) => (
               <li key={slice.key} className="flex items-center gap-1.5">
                 <span
